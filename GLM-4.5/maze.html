@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>迷宫生成器与寻路算法演示</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <style>
+      @keyframes pulse {
+        0%,
+        100% {
+          transform: scale(1);
+          opacity: 0.8;
+        }
+        50% {
+          transform: scale(1.2);
+          opacity: 1;
+        }
+      }
+
+      .path-animation {
+        animation: pulse 0.5s ease-in-out;
+      }
+
+      .maze-container {
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+          0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      }
+
+      .algorithm-btn {
+        transition: all 0.3s ease;
+      }
+
+      .algorithm-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      }
+
+      .algorithm-btn.active {
+        background-color: #3b82f6;
+        color: white;
+      }
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .legend-color {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+      <!-- 标题 -->
+      <header class="text-center mb-8">
+        <h1 class="text-4xl font-bold text-gray-800 mb-2">
+          <i class="fas fa-maze mr-2"></i>迷宫生成器与寻路算法演示
+        </h1>
+        <p class="text-gray-600">探索不同的迷宫生成算法和寻路策略</p>
+      </header>
+
+      <!-- 控制面板 -->
+      <section class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- 迷宫控制 -->
+          <div>
+            <h3 class="text-lg font-semibold mb-3 text-gray-700">
+              <i class="fas fa-cog mr-2"></i>迷宫控制
+            </h3>
+            <div class="flex flex-wrap gap-3">
+              <button
+                id="generateMaze"
+                class="algorithm-btn bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
+              >
+                <i class="fas fa-sync-alt mr-2"></i>生成新迷宫
+              </button>
+              <select
+                id="mazeSize"
+                class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="20">小 (20x20)</option>
+                <option value="30" selected>中 (30x30)</option>
+                <option value="40">大 (40x40)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- 寻路算法 -->
+          <div>
+            <h3 class="text-lg font-semibold mb-3 text-gray-700">
+              <i class="fas fa-route mr-2"></i>寻路算法
+            </h3>
+            <div class="flex flex-wrap gap-2">
+              <button
+                class="algorithm-btn bg-gray-200 px-3 py-2 rounded-lg hover:bg-gray-300"
+                data-algorithm="astar"
+              >
+                A* 算法
+              </button>
+              <button
+                class="algorithm-btn bg-gray-200 px-3 py-2 rounded-lg hover:bg-gray-300"
+                data-algorithm="dijkstra"
+              >
+                Dijkstra
+              </button>
+              <button
+                class="algorithm-btn bg-gray-200 px-3 py-2 rounded-lg hover:bg-gray-300"
+                data-algorithm="bfs"
+              >
+                广度优先
+              </button>
+              <button
+                class="algorithm-btn bg-gray-200 px-3 py-2 rounded-lg hover:bg-gray-300"
+                data-algorithm="dfs"
+              >
+                深度优先
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 图例 -->
+        <div class="mt-6 pt-6 border-t border-gray-200">
+          <h4 class="text-sm font-semibold mb-3 text-gray-600">图例</h4>
+          <div class="flex flex-wrap gap-4 text-sm">
+            <div class="legend-item">
+              <div class="legend-color bg-green-500"></div>
+              <span>起点</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color bg-red-500"></div>
+              <span>终点</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color bg-blue-400"></div>
+              <span>探索中</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color bg-yellow-400"></div>
+              <span>最短路径</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color bg-purple-300"></div>
+              <span>已访问</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 迷宫显示区域 -->
+      <section class="bg-white rounded-lg shadow-md p-6">
+        <div class="maze-container flex justify-center">
+          <canvas
+            id="mazeCanvas"
+            class="border-2 border-gray-300 rounded"
+          ></canvas>
+        </div>
+
+        <!-- 状态信息 -->
+        <div id="statusInfo" class="mt-4 text-center text-gray-600">
+          <p>点击"生成新迷宫"开始</p>
+        </div>
+      </section>
+
+      <!-- 算法说明 -->
+      <section class="mt-6 bg-white rounded-lg shadow-md p-6">
+        <h3 class="text-lg font-semibold mb-4 text-gray-700">
+          <i class="fas fa-info-circle mr-2"></i>算法说明
+        </h3>
+        <div
+          class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600"
+        >
+          <div>
+            <h4 class="font-semibold text-gray-700 mb-1">A* 算法</h4>
+            <p>
+              使用启发式函数的最优路径算法，结合了实际距离和预估距离，通常是最快的寻路算法。
+            </p>
+          </div>
+          <div>
+            <h4 class="font-semibold text-gray-700 mb-1">Dijkstra 算法</h4>
+            <p>
+              保证找到最短路径的经典算法，不考虑启发式信息，会探索所有可能的方向。
+            </p>
+          </div>
+          <div>
+            <h4 class="font-semibold text-gray-700 mb-1">广度优先搜索 (BFS)</h4>
+            <p>逐层探索的算法，保证找到最短路径，但探索范围较大。</p>
+          </div>
+          <div>
+            <h4 class="font-semibold text-gray-700 mb-1">深度优先搜索 (DFS)</h4>
+            <p>
+              沿着一条路径深入探索直到尽头，不一定找到最短路径，但内存占用较少。
+            </p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      class MazeGenerator {
+        constructor(canvas, size = 30) {
+          this.canvas = canvas;
+          this.ctx = canvas.getContext("2d");
+          this.size = size;
+          this.cellSize = Math.min(600 / size, 20);
+          this.canvas.width = this.size * this.cellSize;
+          this.canvas.height = this.size * this.cellSize;
+          this.maze = [];
+          this.start = { x: 0, y: 0 };
+          this.end = { x: size - 1, y: size - 1 };
+          this.isAnimating = false;
+          this.init();
+        }
+
+        init() {
+          // 初始化迷宫，所有墙都存在
+          this.maze = Array(this.size)
+            .fill(null)
+            .map(() =>
+              Array(this.size)
+                .fill(null)
+                .map(() => ({
+                  top: true,
+                  right: true,
+                  bottom: true,
+                  left: true,
+                  visited: false,
+                }))
+            );
+        }
+
+        generate() {
+          this.init();
+          const stack = [];
+          const current = { x: 0, y: 0 };
+          this.maze[0][0].visited = true;
+          stack.push(current);
+
+          while (stack.length > 0) {
+            const neighbors = this.getUnvisitedNeighbors(current);
+
+            if (neighbors.length > 0) {
+              const next =
+                neighbors[Math.floor(Math.random() * neighbors.length)];
+              this.removeWall(current, next);
+              current.x = next.x;
+              current.y = next.y;
+              this.maze[next.y][next.x].visited = true;
+              stack.push({ ...current });
+            } else if (stack.length > 0) {
+              const prev = stack.pop();
+              current.x = prev.x;
+              current.y = prev.y;
+            }
+          }
+
+          this.draw();
+        }
+
+        getUnvisitedNeighbors(cell) {
+          const neighbors = [];
+          const { x, y } = cell;
+
+          if (y > 0 && !this.maze[y - 1][x].visited)
+            neighbors.push({ x, y: y - 1 });
+          if (x < this.size - 1 && !this.maze[y][x + 1].visited)
+            neighbors.push({ x: x + 1, y });
+          if (y < this.size - 1 && !this.maze[y + 1][x].visited)
+            neighbors.push({ x, y: y + 1 });
+          if (x > 0 && !this.maze[y][x - 1].visited)
+            neighbors.push({ x: x - 1, y });
+
+          return neighbors;
+        }
+
+        removeWall(current, next) {
+          const dx = current.x - next.x;
+          const dy = current.y - next.y;
+
+          if (dx === 1) {
+            this.maze[current.y][current.x].left = false;
+            this.maze[next.y][next.x].right = false;
+          } else if (dx === -1) {
+            this.maze[current.y][current.x].right = false;
+            this.maze[next.y][next.x].left = false;
+          } else if (dy === 1) {
+            this.maze[current.y][current.x].top = false;
+            this.maze[next.y][next.x].bottom = false;
+          } else if (dy === -1) {
+            this.maze[current.y][current.x].bottom = false;
+            this.maze[next.y][next.x].top = false;
+          }
+        }
+
+        draw() {
+          this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+          this.ctx.strokeStyle = "#374151";
+          this.ctx.lineWidth = 2;
+
+          for (let y = 0; y < this.size; y++) {
+            for (let x = 0; x < this.size; x++) {
+              const cell = this.maze[y][x];
+              const px = x * this.cellSize;
+              const py = y * this.cellSize;
+
+              this.ctx.beginPath();
+              if (cell.top) {
+                this.ctx.moveTo(px, py);
+                this.ctx.lineTo(px + this.cellSize, py);
+              }
+              if (cell.right) {
+                this.ctx.moveTo(px + this.cellSize, py);
+                this.ctx.lineTo(px + this.cellSize, py + this.cellSize);
+              }
+              if (cell.bottom) {
+                this.ctx.moveTo(px + this.cellSize, py + this.cellSize);
+                this.ctx.lineTo(px, py + this.cellSize);
+              }
+              if (cell.left) {
+                this.ctx.moveTo(px, py + this.cellSize);
+                this.ctx.lineTo(px, py);
+              }
+              this.ctx.stroke();
+            }
+          }
+
+          // 绘制起点和终点
+          this.drawCell(this.start.x, this.start.y, "#10b981");
+          this.drawCell(this.end.x, this.end.y, "#ef4444");
+        }
+
+        drawCell(x, y, color) {
+          this.ctx.fillStyle = color;
+          this.ctx.beginPath();
+          this.ctx.arc(
+            x * this.cellSize + this.cellSize / 2,
+            y * this.cellSize + this.cellSize / 2,
+            this.cellSize / 3,
+            0,
+            Math.PI * 2
+          );
+          this.ctx.fill();
+        }
+
+        drawPathCell(x, y, color, scale = 0.4) {
+          this.ctx.fillStyle = color;
+          this.ctx.beginPath();
+          this.ctx.arc(
+            x * this.cellSize + this.cellSize / 2,
+            y * this.cellSize + this.cellSize / 2,
+            this.cellSize * scale,
+            0,
+            Math.PI * 2
+          );
+          this.ctx.fill();
+        }
+
+        getNeighbors(x, y) {
+          const neighbors = [];
+          const cell = this.maze[y][x];
+
+          if (!cell.top && y > 0) neighbors.push({ x, y: y - 1 });
+          if (!cell.right && x < this.size - 1) neighbors.push({ x: x + 1, y });
+          if (!cell.bottom && y < this.size - 1)
+            neighbors.push({ x, y: y + 1 });
+          if (!cell.left && x > 0) neighbors.push({ x: x - 1, y });
+
+          return neighbors;
+        }
+
+        async findPath(algorithm) {
+          if (this.isAnimating) return;
+          this.isAnimating = true;
+
+          const startTime = performance.now();
+          let path = [];
+          let visited = new Set();
+          let explored = 0;
+
+          switch (algorithm) {
+            case "astar":
+              ({ path, visited, explored } = await this.aStar());
+              break;
+            case "dijkstra":
+              ({ path, visited, explored } = await this.dijkstra());
+              break;
+            case "bfs":
+              ({ path, visited, explored } = await this.bfs());
+              break;
+            case "dfs":
+              ({ path, visited, explored } = await this.dfs());
+              break;
+          }
+
+          const endTime = performance.now();
+          const duration = (endTime - startTime).toFixed(2);
+
+          // 显示最终路径
+          if (path.length > 0) {
+            for (let i = 1; i < path.length - 1; i++) {
+              this.drawPathCell(path[i].x, path[i].y, "#fbbf24", 0.5);
+              await this.sleep(20);
+            }
+          }
+
+          document.getElementById("statusInfo").innerHTML = `
+                    <p class="text-lg">
+                        <span class="font-semibold">${algorithm.toUpperCase()}</span> - 
+                        路径长度: <span class="font-bold text-blue-600">${
+                          path.length
+                        }</span> | 
+                        探索节点: <span class="font-bold text-purple-600">${explored}</span> | 
+                        耗时: <span class="font-bold text-green-600">${duration}ms</span>
+                    </p>
+                `;
+
+          this.isAnimating = false;
+        }
+
+        async aStar() {
+          const openSet = [
+            {
+              ...this.start,
+              g: 0,
+              h: this.heuristic(this.start, this.end),
+              f: 0,
+              parent: null,
+            },
+          ];
+          const closedSet = new Set();
+          const visited = new Set();
+          let explored = 0;
+
+          openSet[0].f = openSet[0].g + openSet[0].h;
+
+          while (openSet.length > 0) {
+            openSet.sort((a, b) => a.f - b.f);
+            const current = openSet.shift();
+            const key = `${current.x},${current.y}`;
+
+            if (closedSet.has(key)) continue;
+            closedSet.add(key);
+            visited.add(key);
+            explored++;
+
+            if (current.x === this.end.x && current.y === this.end.y) {
+              return { path: this.reconstructPath(current), visited, explored };
+            }
+
+            this.drawPathCell(current.x, current.y, "#60a5fa", 0.3);
+            await this.sleep(10);
+
+            const neighbors = this.getNeighbors(current.x, current.y);
+            for (const neighbor of neighbors) {
+              const neighborKey = `${neighbor.x},${neighbor.y}`;
+              if (closedSet.has(neighborKey)) continue;
+
+              const g = current.g + 1;
+              const h = this.heuristic(neighbor, this.end);
+              const f = g + h;
+
+              const existing = openSet.find(
+                (n) => n.x === neighbor.x && n.y === neighbor.y
+              );
+              if (!existing || g < existing.g) {
+                if (existing) {
+                  existing.g = g;
+                  existing.f = f;
+                  existing.parent = current;
+                } else {
+                  openSet.push({ ...neighbor, g, h, f, parent: current });
+                }
+              }
+            }
+          }
+
+          return { path: [], visited, explored };
+        }
+
+        async dijkstra() {
+          const distances = {};
+          const previous = {};
+          const unvisited = new Set();
+          const visited = new Set();
+          let explored = 0;
+
+          for (let y = 0; y < this.size; y++) {
+            for (let x = 0; x < this.size; x++) {
+              const key = `${x},${y}`;
+              distances[key] = Infinity;
+              unvisited.add(key);
+            }
+          }
+
+          const startKey = `${this.start.x},${this.start.y}`;
+          distances[startKey] = 0;
+
+          while (unvisited.size > 0) {
+            let current = null;
+            let minDistance = Infinity;
+
+            for (const key of unvisited) {
+              if (distances[key] < minDistance) {
+                minDistance = distances[key];
+                current = key;
+              }
+            }
+
+            if (!current || minDistance === Infinity) break;
+
+            unvisited.delete(current);
+            visited.add(current);
+            explored++;
+
+            const [x, y] = current.split(",").map(Number);
+            this.drawPathCell(x, y, "#60a5fa", 0.3);
+            await this.sleep(10);
+
+            if (x === this.end.x && y === this.end.y) {
+              return {
+                path: this.reconstructPathFromPrevious(previous, current),
+                visited,
+                explored,
+              };
+            }
+
+            const neighbors = this.getNeighbors(x, y);
+            for (const neighbor of neighbors) {
+              const neighborKey = `${neighbor.x},${neighbor.y}`;
+              if (!unvisited.has(neighborKey)) continue;
+
+              const alt = distances[current] + 1;
+              if (alt < distances[neighborKey]) {
+                distances[neighborKey] = alt;
+                previous[neighborKey] = current;
+              }
+            }
+          }
+
+          return { path: [], visited, explored };
+        }
+
+        async bfs() {
+          const queue = [{ ...this.start, parent: null }];
+          const visited = new Set([`${this.start.x},${this.start.y}`]);
+          let explored = 0;
+
+          while (queue.length > 0) {
+            const current = queue.shift();
+            explored++;
+
+            if (current.x === this.end.x && current.y === this.end.y) {
+              return { path: this.reconstructPath(current), visited, explored };
+            }
+
+            this.drawPathCell(current.x, current.y, "#60a5fa", 0.3);
+            await this.sleep(10);
+
+            const neighbors = this.getNeighbors(current.x, current.y);
+            for (const neighbor of neighbors) {
+              const key = `${neighbor.x},${neighbor.y}`;
+              if (!visited.has(key)) {
+                visited.add(key);
+                queue.push({ ...neighbor, parent: current });
+              }
+            }
+          }
+
+          return { path: [], visited, explored };
+        }
+
+        async dfs() {
+          const stack = [{ ...this.start, parent: null }];
+          const visited = new Set();
+          let explored = 0;
+
+          while (stack.length > 0) {
+            const current = stack.pop();
+            const key = `${current.x},${current.y}`;
+
+            if (visited.has(key)) continue;
+            visited.add(key);
+            explored++;
+
+            if (current.x === this.end.x && current.y === this.end.y) {
+              return { path: this.reconstructPath(current), visited, explored };
+            }
+
+            this.drawPathCell(current.x, current.y, "#60a5fa", 0.3);
+            await this.sleep(10);
+
+            const neighbors = this.getNeighbors(current.x, current.y);
+            for (const neighbor of neighbors) {
+              const neighborKey = `${neighbor.x},${neighbor.y}`;
+              if (!visited.has(neighborKey)) {
+                stack.push({ ...neighbor, parent: current });
+              }
+            }
+          }
+
+          return { path: [], visited, explored };
+        }
+
+        heuristic(a, b) {
+          return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+        }
+
+        reconstructPath(node) {
+          const path = [];
+          let current = node;
+          while (current) {
+            path.unshift({ x: current.x, y: current.y });
+            current = current.parent;
+          }
+          return path;
+        }
+
+        reconstructPathFromPrevious(previous, endKey) {
+          const path = [];
+          let current = endKey;
+          while (current) {
+            const [x, y] = current.split(",").map(Number);
+            path.unshift({ x, y });
+            current = previous[current];
+          }
+          return path;
+        }
+
+        sleep(ms) {
+          return new Promise((resolve) => setTimeout(resolve, ms));
+        }
+      }
+
+      // 初始化
+      const canvas = document.getElementById("mazeCanvas");
+      const sizeSelect = document.getElementById("mazeSize");
+      let maze = new MazeGenerator(canvas, parseInt(sizeSelect.value));
+
+      // 生成迷宫
+      document.getElementById("generateMaze").addEventListener("click", () => {
+        const size = parseInt(sizeSelect.value);
+        maze = new MazeGenerator(canvas, size);
+        maze.generate();
+        document.getElementById("statusInfo").innerHTML =
+          "<p>迷宫已生成，选择寻路算法开始探索</p>";
+
+        // 清除算法按钮的激活状态
+        document
+          .querySelectorAll(".algorithm-btn[data-algorithm]")
+          .forEach((btn) => {
+            btn.classList.remove("active");
+          });
+      });
+
+      // 算法按钮
+      document
+        .querySelectorAll(".algorithm-btn[data-algorithm]")
+        .forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const algorithm = btn.dataset.algorithm;
+
+            // 更新按钮状态
+            document
+              .querySelectorAll(".algorithm-btn[data-algorithm]")
+              .forEach((b) => {
+                b.classList.remove("active");
+              });
+            btn.classList.add("active");
+
+            // 重新绘制迷宫以清除之前的路径
+            maze.draw();
+
+            // 执行寻路算法
+            maze.findPath(algorithm);
+          });
+        });
+
+      // 初始生成迷宫
+      maze.generate();
+    </script>
+  </body>
+</html>

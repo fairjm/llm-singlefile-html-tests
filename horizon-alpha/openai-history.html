@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark light" />
+  <title>OpenAI · 历程、模型与生态 - Horizon Alpha</title>
+  <meta name="description" content="现代感的单页 OpenAI 介绍：里程碑时间线、模型家族、研究与安全、生态与 API、社区观点，包含玻璃拟态、视差与滚动动画。" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+
+  <!-- TailwindCSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: ['class', '[data-theme="dark"]'],
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#ECF5FF',
+              100: '#D7E9FF',
+              200: '#ADD1FF',
+              300: '#7DB6FF',
+              400: '#569DFF',
+              500: '#2E83FF',
+              600: '#1F63D6',
+              700: '#174AA8',
+              800: '#0F3172',
+              900: '#0B214E'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'Segoe UI', 'Helvetica Neue', 'Arial', 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace']
+          },
+          boxShadow: {
+            glass: '0 8px 30px rgba(2, 6, 23, 0.30)',
+            glow: '0 0 40px rgba(46,131,255,0.35)'
+          },
+          backdropBlur: {
+            glass: '8px'
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Iconify -->
+  <script src="https://code.iconify.design/3/3.1.0/iconify.min.js"></script>
+
+  <!-- AOS (Animate on Scroll) -->
+  <link href="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.css" rel="stylesheet" />
+  <script defer src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
+
+  <!-- GSAP + ScrollTrigger -->
+  <script defer src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+
+  <!-- Three.js for particles -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.min.js"></script>
+
+  <!-- Locomotive Scroll (removed due to anchor/hash incompatibility on plain file) -->
+  <!-- <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/locomotive-scroll@4.1.4/dist/locomotive-scroll.css" /> -->
+  <!-- <script defer src="https://cdn.jsdelivr.net/npm/locomotive-scroll@4.1.4/dist/locomotive-scroll.min.js"></script> -->
+
+  <style>
+    :root {
+      --bg-start: 10, 15, 25;
+      --bg-end: 4, 4, 10;
+      --glass-bg: 255, 255, 255;
+      --glass-alpha: 0.08;
+      --stroke-alpha: 0.16;
+      --ring: 46, 131, 255;
+    }
+    html, body {
+      height: 100%;
+      background: radial-gradient(1200px circle at 20% -10%, rgba(46,131,255,0.12), transparent 60%),
+                  radial-gradient(1000px circle at 90% 10%, rgba(23,74,168,0.10), transparent 60%),
+                  linear-gradient(120deg, rgb(var(--bg-start)) 0%, rgb(var(--bg-end)) 100%);
+      color: #e8eefc;
+      scroll-behavior: smooth;
+      overscroll-behavior-y: none;
+    }
+    .glass {
+      background: rgba(var(--glass-bg), var(--glass-alpha));
+      border: 1px solid rgba(255,255,255, var(--stroke-alpha));
+      backdrop-filter: blur(10px) saturate(120%);
+      -webkit-backdrop-filter: blur(10px) saturate(120%);
+      box-shadow: var(--shadow, 0 8px 30px rgba(2, 6, 23, 0.25));
+    }
+    .divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+    }
+    .gradient-text {
+      background: linear-gradient(90deg, #8ab4ff, #e0e7ff, #9bd0ff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .orb {
+      position: absolute;
+      width: var(--s, 240px);
+      height: var(--s, 240px);
+      background: radial-gradient(circle at 30% 30%, rgba(46,131,255,0.9), rgba(23,74,168,0.55) 55%, transparent 65%);
+      filter: blur(16px) saturate(120%);
+      mix-blend-mode: screen;
+      pointer-events: none;
+    }
+    .orb--pink { background: radial-gradient(circle at 30% 30%, rgba(255,88,173,0.9), rgba(155,52,239,0.55) 55%, transparent 65%); }
+    .border-gradient {
+      position: relative;
+    }
+    .border-gradient:before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      padding: 1px;
+      background: linear-gradient(135deg, rgba(46,131,255,0.8), rgba(155,52,239,0.7), rgba(46,131,255,0.8));
+      -webkit-mask: 
+        linear-gradient(#000 0 0) content-box, 
+        linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+              mask-composite: exclude;
+      pointer-events: none;
+    }
+    .tilt {
+      transform-style: preserve-3d;
+      will-change: transform;
+    }
+    .tilt .tilt-inner {
+      transform: translateZ(24px);
+    }
+    .sticky-nav {
+      background: rgba(8, 12, 20, 0.45);
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      backdrop-filter: blur(10px) saturate(120%);
+      -webkit-backdrop-filter: blur(10px) saturate(120%);
+    }
+    .nav-link.active {
+      color: #ffffff;
+    }
+    /* Timeline */
+    .timeline {
+      position: relative;
+    }
+    .timeline:before {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: linear-gradient(180deg, rgba(255,255,255,0), rgba(255,255,255,0.25), rgba(255,255,255,0));
+      transform: translateX(-50%);
+    }
+    .timeline-dot {
+      width: 12px; height: 12px; border-radius: 999px;
+      background: radial-gradient(circle, #BFD4FF 0%, #2E83FF 60%, #0B214E 100%);
+      box-shadow: 0 0 24px rgba(46,131,255,0.6), 0 0 2px rgba(46,131,255,1) inset;
+      border: 1px solid rgba(255,255,255,0.35);
+    }
+    /* Code block */
+    pre.code {
+      background: rgba(0, 10, 25, 0.5);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      overflow: auto;
+      box-shadow: 0 6px 24px rgba(2,6,23,0.3);
+    }
+    code.snippet {
+      font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.9rem;
+      line-height: 1.6;
+      tab-size: 2;
+      color: #dce7ff;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #2E83FF, #8b5cf6);
+      box-shadow: 0 8px 24px rgba(46,131,255,0.35), inset 0 0 0 1px rgba(255,255,255,0.15);
+    }
+    .btn-primary:hover {
+      filter: brightness(1.05);
+      box-shadow: 0 10px 30px rgba(46,131,255,0.5), inset 0 0 0 1px rgba(255,255,255,0.18);
+      transform: translateY(-1px);
+    }
+    .section {
+      min-height: 70vh;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .tilt, .tilt .tilt-inner, .parallax, [data-aos] {
+        transition: none !important;
+        animation: none !important;
+      }
+    }
+    /* Ensure parallax layers are visible and not clipped */
+    #hero { position: relative; }
+    .parallax { transform: translate3d(0,0,0); }
+  </style>
+</head>
+
+<body data-theme="dark" class="font-sans">
+  <!-- Global Particles Canvas -->
+  <canvas id="bg-particles" style="position:fixed;inset:0;z-index:-1;opacity:0.45;"></canvas>
+
+  <!-- Floating orbs -->
+  <div class="orb" style="--s:320px; top: -60px; left: -60px;"></div>
+  <div class="orb orb--pink" style="--s:260px; bottom: 10%; right: -40px;"></div>
+  <div class="orb" style="--s:200px; top: 40%; left: 10%;"></div>
+
+  <!-- Navbar -->
+  <header class="sticky top-0 z-40 sticky-nav">
+    <div class="mx-auto max-w-7xl px-5">
+      <div class="flex items-center justify-between h-16">
+        <a href="#hero" class="flex items-center gap-3">
+          <span class="iconify text-2xl text-brand-300" data-icon="ph:sparkle-bold"></span>
+          <span class="font-extrabold tracking-tight">Horizon Alpha · OpenAI</span>
+        </a>
+        <nav class="hidden md:flex items-center gap-6 text-sm text-slate-300">
+          <a class="nav-link hover:text-white transition" href="#about">概览</a>
+          <a class="nav-link hover:text-white transition" href="#timeline">历程</a>
+          <a class="nav-link hover:text-white transition" href="#models">模型</a>
+          <a class="nav-link hover:text-white transition" href="#research">研究与安全</a>
+          <a class="nav-link hover:text-white transition" href="#ecosystem">生态与 API</a>
+          <a class="nav-link hover:text-white transition" href="#quotes">观点</a>
+        </nav>
+        <a href="#cta" class="btn-primary px-4 py-2 rounded-lg text-sm font-semibold transition will-change-transform">开始使用</a>
+      </div>
+    </div>
+    <div class="divider"></div>
+  </header>
+
+  <!-- Page Container -->
+  <main id="page-container">
+    <!-- Hero -->
+    <section id="hero" class="relative overflow-hidden section pt-20">
+      <!-- Parallax layers -->
+      <div class="pointer-events-none absolute inset-0 -z-0">
+        <div class="parallax absolute -top-16 left-1/2 -translate-x-1/2 w-[1200px] h-[1200px] rounded-full opacity-30 will-change-transform"
+             data-speed="0.15"
+             style="background: radial-gradient(circle at 50% 50%, rgba(46,131,255,0.35), transparent 55%); filter: blur(40px);"></div>
+        <div class="parallax absolute top-1/3 right-10 w-[420px] h-[420px] rounded-full opacity-25 will-change-transform"
+             data-speed="0.35"
+             style="background: conic-gradient(from 120deg, rgba(139,92,246,0.6), rgba(46,131,255,0.6), rgba(139,92,246,0.6)); filter: blur(50px);"></div>
+        <!-- add an extra subtle layer -->
+        <div class="parallax absolute bottom-0 left-10 w-[500px] h-[500px] rounded-full opacity-15 will-change-transform"
+             data-speed="0.25"
+             style="background: radial-gradient(circle at 60% 60%, rgba(155,52,239,0.35), transparent 60%); filter: blur(50px);"></div>
+      </div>
+
+      <div class="mx-auto max-w-7xl px-5 relative">
+        <div class="grid lg:grid-cols-2 gap-8 items-center">
+          <div data-aos="fade-up" data-aos-delay="100">
+            <h1 class="text-4xl md:text-6xl font-extrabold tracking-tight leading-tight">
+              以智能拓展边界
+              <span class="block gradient-text">OpenAI 的过去、现在与未来</span>
+            </h1>
+            <p class="mt-6 text-slate-300 text-lg">
+              OpenAI 专注于通用人工智能的研究与落地。通过 GPT、DALL·E、Whisper 等模型，推动自然语言、图像、语音等多模态能力在全球范围内普惠。
+            </p>
+            <div class="mt-8 flex flex-wrap gap-3">
+              <a href="#timeline" class="glass hover:shadow-glow px-4 py-2 rounded-lg border-gradient inline-flex items-center gap-2 transition">
+                <span class="iconify text-brand-200" data-icon="ph:timeline-bold"></span>
+                里程碑时间线
+              </a>
+              <a href="#models" class="glass hover:shadow-glow px-4 py-2 rounded-lg inline-flex items-center gap-2 transition">
+                <span class="iconify text-brand-200" data-icon="ph:brain-bold"></span>
+                模型家族
+              </a>
+              <a href="#ecosystem" class="glass hover:shadow-glow px-4 py-2 rounded-lg inline-flex items-center gap-2 transition">
+                <span class="iconify text-brand-200" data-icon="ph:cube-focus-bold"></span>
+                API 与生态
+              </a>
+            </div>
+            <div class="mt-10 text-xs text-slate-400">
+              滚动探索 · 支持视差与滚动动画
+            </div>
+          </div>
+
+          <div class="relative h-[420px] lg:h-[520px] tilt" data-aos="zoom-in" data-aos-delay="200">
+            <div class="absolute inset-0 rounded-3xl glass border-gradient"></div>
+            <div class="absolute inset-0 rounded-3xl p-1">
+              <div class="tilt-inner w-full h-full rounded-[22px] grid grid-cols-2 gap-3 p-5">
+                <div class="glass rounded-2xl p-5 flex flex-col justify-between">
+                  <div class="text-slate-200 font-semibold flex items-center gap-2">
+                    <span class="iconify text-brand-300" data-icon="ph:lightbulb-bold"></span>
+                    多模态
+                  </div>
+                  <div class="text-4xl font-extrabold gradient-text">GPT-4o</div>
+                  <div class="text-slate-400 text-sm">文本、图像、音频、视频统一交互</div>
+                </div>
+                <div class="glass rounded-2xl p-5 flex flex-col justify-between">
+                  <div class="text-slate-200 font-semibold flex items-center gap-2">
+                    <span class="iconify text-brand-300" data-icon="ph:image-bold"></span>
+                    生成图像
+                  </div>
+                  <div class="text-4xl font-extrabold">DALL·E</div>
+                  <div class="text-slate-400 text-sm">从文字到视觉的创造力</div>
+                </div>
+                <div class="glass rounded-2xl p-5 col-span-2">
+                  <div class="flex items-center justify-between">
+                    <div class="text-slate-200 font-semibold flex items-center gap-2">
+                      <span class="iconify text-brand-300" data-icon="ph:terminal-window-bold"></span>
+                      开发者生态
+                    </div>
+                    <span class="text-xs text-slate-400">API · 工具 · 安全</span>
+                  </div>
+                  <pre class="code mt-3 p-4 overflow-auto"><code class="snippet">curl https://api.openai.com/v1/chat/completions \
+ -H "Authorization: Bearer <YOUR_KEY>" \
+ -H "Content-Type: application/json" \
+ -d '{
+  "model": "gpt-4o-mini",
+  "messages": [{"role":"user","content":"你好，帮我总结 OpenAI 的使命"}]
+}'</code></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scroll hint -->
+        <div class="mt-12 flex items-center gap-3 text-slate-400 text-sm">
+          <span class="iconify" data-icon="ph:mouse-bold"></span>
+          下滑查看更多
+        </div>
+      </div>
+    </section>
+
+    <!-- About -->
+    <section id="about" class="section py-24">
+      <div class="mx-auto max-w-7xl px-5">
+        <div class="grid md:grid-cols-3 gap-6">
+          <div class="glass rounded-2xl p-7" data-aos="fade-up">
+            <div class="flex items-center gap-3">
+              <span class="iconify text-2xl text-brand-300" data-icon="ph:target-bold"></span>
+              <h3 class="text-xl font-bold">使命</h3>
+            </div>
+            <p class="mt-3 text-slate-300">
+              确保通用人工智能（AGI）惠及全人类。OpenAI 在能力、对齐、安全方面持续投入，推动 AI 的可靠性与可控性。
+            </p>
+          </div>
+          <div class="glass rounded-2xl p-7" data-aos="fade-up" data-aos-delay="100">
+            <div class="flex items-center gap-3">
+              <span class="iconify text-2xl text-brand-300" data-icon="ph:rocket-launch-bold"></span>
+              <h3 class="text-xl font-bold">工程</h3>
+            </div>
+            <p class="mt-3 text-slate-300">
+              从基础模型训练、推理系统到工具链与基础设施，工程与研究一体化，驱动快速迭代与产品化交付。
+            </p>
+          </div>
+          <div class="glass rounded-2xl p-7" data-aos="fade-up" data-aos-delay="200">
+            <div class="flex items-center gap-3">
+              <span class="iconify text-2xl text-brand-300" data-icon="ph:shield-check-bold"></span>
+              <h3 class="text-xl font-bold">安全与对齐</h3>
+            </div>
+            <p class="mt-3 text-slate-300">
+              采用 RLHF、宪法式对齐、系统指令、红队评测等手段，减少有害输出并提升可靠性与透明性。
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Timeline -->
+    <section id="timeline" class="section py-24">
+      <div class="mx-auto max-w-7xl px-5">
+        <h2 class="text-3xl md:text-4xl font-extrabold mb-12">OpenAI 历程</h2>
+        <div class="timeline">
+          <div class="space-y-14">
+            <!-- 2015 -->
+            <div class="grid md:grid-cols-2 gap-6 items-center" data-aos="fade-right">
+              <div class="md:text-right order-2 md:order-1">
+                <div class="inline-flex items-center gap-3 glass rounded-xl px-4 py-2">
+                  <span class="timeline-dot"></span>
+                  <span class="text-sm text-slate-300">2015</span>
+                </div>
+                <h3 class="text-2xl font-bold mt-4">成立</h3>
+                <p class="text-slate-300 mt-2">致力于安全发展的 AI 研究机构，初衷是开放合作、普惠共享。</p>
+              </div>
+              <div class="order-1 md:order-2">
+                <div class="glass rounded-2xl p-6">
+                  <div class="text-slate-400 text-sm">愿景</div>
+                  <div class="text-slate-200">推动安全且有益的通用人工智能。</div>
+                </div>
+              </div>
+            </div>
+            <!-- 2018-2020 -->
+            <div class="grid md:grid-cols-2 gap-6 items-center" data-aos="fade-left">
+              <div>
+                <div class="glass rounded-2xl p-6">
+                  <div class="text-slate-400 text-sm">模型演进</div>
+                  <div class="text-slate-200">GPT 系列迭代，逐步提升语言理解与生成能力。</div>
+                </div>
+              </div>
+              <div class="md:text-left">
+                <div class="inline-flex items-center gap-3 glass rounded-xl px-4 py-2">
+                  <span class="timeline-dot"></span>
+                  <span class="text-sm text-slate-300">2018–2020</span>
+                </div>
+                <h3 class="text-2xl font-bold mt-4">GPT-1/2/3</h3>
+                <p class="text-slate-300 mt-2">从预训练语言模型探索到通用能力的显著跃迁。</p>
+              </div>
+            </div>
+            <!-- 2021-2022 -->
+            <div class="grid md:grid-cols-2 gap-6 items-center" data-aos="fade-right">
+              <div class="md:text-right order-2 md:order-1">
+                <div class="inline-flex items-center gap-3 glass rounded-xl px-4 py-2">
+                  <span class="timeline-dot"></span>
+                  <span class="text-sm text-slate-300">2021–2022</span>
+                </div>
+                <h3 class="text-2xl font-bold mt-4">多模态与工具化</h3>
+                <p class="text-slate-300 mt-2">DALL·E、Codex、Whisper 发布，图像、代码、语音能力融合。</p>
+              </div>
+              <div class="order-1 md:order-2">
+                <div class="glass rounded-2xl p-6">
+                  <div class="text-slate-400 text-sm">开发者浪潮</div>
+                  <div class="text-slate-200">API 与生态扩展，出现大量创新应用。</div>
+                </div>
+              </div>
+            </div>
+            <!-- 2023-Now -->
+            <div class="grid md:grid-cols-2 gap-6 items-center" data-aos="fade-left">
+              <div>
+                <div class="glass rounded-2xl p-6">
+                  <div class="text-slate-400 text-sm">对齐与规模</div>
+                  <div class="text-slate-200">安全对齐方法与大规模训练策略并进。</div>
+                </div>
+              </div>
+              <div class="md:text-left">
+                <div class="inline-flex items-center gap-3 glass rounded-xl px-4 py-2">
+                  <span class="timeline-dot"></span>
+                  <span class="text-sm text-slate-300">2023–至今</span>
+                </div>
+                <h3 class="text-2xl font-bold mt-4">GPT-4 系列与 GPT-4o</h3>
+                <p class="text-slate-300 mt-2">多模态统一、推理更强、成本更优，走向实时智能体。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Models -->
+    <section id="models" class="section py-24">
+      <div class="mx-auto max-w-7xl px-5">
+        <div class="flex items-end justify-between mb-10">
+          <h2 class="text-3xl md:text-4xl font-extrabold">模型家族</h2>
+          <div class="text-slate-400 text-sm">Hover 以查看动效</div>
+        </div>
+        <div class="grid md:grid-cols-3 gap-6">
+          <!-- GPT -->
+          <div class="glass rounded-2xl p-6 tilt group border-gradient" data-tilt>
+            <div class="tilt-inner">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="iconify text-2xl text-brand-300" data-icon="ph:brain-bold"></span>
+                  <h3 class="text-xl font-bold">GPT-4 / 4o / mini</h3>
+                </div>
+                <span class="text-xs text-slate-400">通用</span>
+              </div>
+              <p class="text-slate-300 mt-3">强大的理解与生成，支持多模态输入输出，适用于问答、总结、规划、创作。</p>
+              <div class="mt-4 flex flex-wrap gap-2">
+                <span class="px-2 py-1 text-xs rounded-md bg-white/5 border border-white/10">推理</span>
+                <span class="px-2 py-1 text-xs rounded-md bg-white/5 border border-white/10">多模态</span>
+                <span class="px-2 py-1 text-xs rounded-md bg-white/5 border border-white/10">工具调用</span>
+              </div>
+            </div>
+          </div>
+          <!-- DALL·E -->
+          <div class="glass rounded-2xl p-6 tilt group" data-tilt>
+            <div class="tilt-inner">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="iconify text-2xl text-brand-300" data-icon="ph:image-bold"></span>
+                  <h3 class="text-xl font-bold">DALL·E</h3>
+                </div>
+                <span class="text-xs text-slate-400">图像</span>
+              </div>
+              <p class="text-slate-300 mt-3">文本到图像的高保真生成与编辑，支持风格化与构图控制。</p>
+              <div class="mt-4 flex flex-wrap gap-2">
+                <span class="px-2 py-1 text-xs rounded-md bg-white/5 border border-white/10">创意</span>
+                <span class="px-2 py-1 text-xs rounded-md bg-white/5 border border-white/10">图生图</span>
+                <span class="px-2 py-1 text-xs rounded-md bg-white/5 border border-white/10">修复</span>
+              </div>
+            </div>
+          </div>
+          <!-- Whisper -->
+          <div class="glass rounded-2xl p-6 tilt group" data-tilt>
+            <div class="tilt-inner">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="iconify text-2xl text-brand-300" data-icon="ph:waveform-bold"></span>
+                  <h3 class="text-xl font-bold">Whisper</h3>
+                </div>
+                <span class="text-xs text-slate-400">语音</span>
+              </div>
+              <p class="text-slate-300 mt-3">稳健的语音识别与翻译，适合多语言场景与实时字幕。</p>
+              <div class="mt-4 flex flex-wrap gap-2">
+                <span class="px-2 py-1 text-xs rounded-md bg-white/5 border border-white/10">ASR</span>
+                <span class="px-2 py-1 text-xs rounded-md bg-white/5 border border-white/10">翻译</span>
+                <span class="px-2 py-1 text-xs rounded-md bg-white/5 border border-white/10">实时</span>
+              </div>
+            </div>
+          </div>
+          <!-- Codex -->
+          <div class="glass rounded-2xl p-6 tilt group" data-tilt>
+            <div class="tilt-inner">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="iconify text-2xl text-brand-300" data-icon="ph:file-code-bold"></span>
+                  <h3 class="text-xl font-bold">Codex</h3>
+                </div>
+                <span class="text-xs text-slate-400">代码</span>
+              </div>
+              <p class="text-slate-300 mt-3">理解与生成代码，支持多语言，能协助补全、重构与解释。</p>
+              <div class="mt-4 flex flex-wrap gap-2">
+                <span class="px-2 py-1 text-xs rounded-md bg-white/5 border border-white/10">补全</span>
+                <span class="px-2 py-1 text-xs rounded-md bg-white/5 border border-white/10">重构</span>
+                <span class="px-2 py-1 text-xs rounded-md bg-white/5 border border-white/10">说明</span>
+              </div>
+            </div>
+          </div>
+          <!-- Sora -->
+          <div class="glass rounded-2xl p-6 tilt group" data-tilt>
+            <div class="tilt-inner">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="iconify text-2xl text-brand-300" data-icon="ph:film-strip-bold"></span>
+                  <h3 class="text-xl font-bold">Sora</h3>
+                </div>
+                <span class="text-xs text-slate-400">视频</span>
+              </div>
+              <p class="text-slate-300 mt-3">面向视频生成的模型方向，探索更强的时空一致性与指令遵循。</p>
+              <div class="mt-4 flex flex-wrap gap-2">
+                <span class="px-2 py-1 text-xs rounded-md bg-white/5 border border-white/10">视频生成</span>
+                <span class="px-2 py-1 text-xs rounded-md bg-white/5 border border-white/10">一致性</span>
+              </div>
+            </div>
+          </div>
+          <!-- Omni / Realtime -->
+          <div class="glass rounded-2xl p-6 tilt group" data-tilt>
+            <div class="tilt-inner">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="iconify text-2xl text-brand-300" data-icon="ph:headset-bold"></span>
+                  <h3 class="text-xl font-bold">Realtime / Agents</h3>
+                </div>
+                <span class="text-xs text-slate-400">实时/智能体</span>
+              </div>
+              <p class="text-slate-300 mt-3">低延迟对话、多模态流式交互，结合工具与记忆打造可执行的智能体。</p>
+              <div class="mt-4 flex flex-wrap gap-2">
+                <span class="px-2 py-1 text-xs rounded-md bg-white/5 border border-white/10">流式</span>
+                <span class="px-2 py-1 text-xs rounded-md bg-white/5 border border-white/10">工具调用</span>
+                <span class="px-2 py-1 text-xs rounded-md bg-white/5 border border-white/10">记忆</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Research & Safety -->
+    <section id="research" class="section py-24">
+      <div class="mx-auto max-w-7xl px-5">
+        <div class="grid lg:grid-cols-2 gap-10 items-center">
+          <div>
+            <h2 class="text-3xl md:text-4xl font-extrabold">研究与安全</h2>
+            <p class="text-slate-300 mt-4">
+              OpenAI 在可解释性、对齐与红队方面持续探索：通过 RLHF、偏见缓解、系统提示与审计管线，降低风险并提升稳健性。
+            </p>
+            <div class="mt-6 grid sm:grid-cols-2 gap-4">
+              <div class="glass rounded-xl p-5">
+                <div class="flex items-center gap-2">
+                  <span class="iconify text-brand-300" data-icon="ph:target-bold"></span>
+                  <div class="font-semibold">对齐（Alignment）</div>
+                </div>
+                <div class="text-slate-400 text-sm mt-2">RLHF、宪法式对齐、拒答与审校策略。</div>
+              </div>
+              <div class="glass rounded-xl p-5">
+                <div class="flex items-center gap-2">
+                  <span class="iconify text-brand-300" data-icon="ph:lock-key-bold"></span>
+                  <div class="font-semibold">安全（Safety）</div>
+                </div>
+                <div class="text-slate-400 text-sm mt-2">能力评测、红队测试、内容过滤与安全层。</div>
+              </div>
+              <div class="glass rounded-xl p-5">
+                <div class="flex items-center gap-2">
+                  <span class="iconify text-brand-300" data-icon="ph:circuitry-bold"></span>
+                  <div class="font-semibold">系统（Systems）</div>
+                </div>
+                <div class="text-slate-400 text-sm mt-2">训练基础设施、推理优化、可扩展性。</div>
+              </div>
+              <div class="glass rounded-xl p-5">
+                <div class="flex items-center gap-2">
+                  <span class="iconify text-brand-300" data-icon="ph:graph-bold"></span>
+                  <div class="font-semibold">评测（Eval）</div>
+                </div>
+                <div class="text-slate-400 text-sm mt-2">多维指标与公开基准协同演进。</div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="glass rounded-2xl p-6">
+              <div class="flex items-center justify-between">
+                <div class="text-slate-200 font-semibold">策略示例</div>
+                <button id="copy-code" class="px-3 py-1.5 rounded-md bg-white/10 border border-white/10 text-xs hover:bg-white/15 active:translate-y-px transition">复制</button>
+              </div>
+              <pre class="code mt-4 p-4"><code id="policy-snippet" class="snippet"># 简化的系统提示示例
+你是一个遵循安全政策的助手：
+- 拒绝违法与危险请求，并提供更安全的替代方案
+- 对未知保持不确定性表达，避免编造
+- 对敏感领域使用中性、克制措辞
+- 如需外部信息，应提示用户并说明来源</code></pre>
+              <div class="text-xs text-slate-400 mt-3">基于对齐与安全经验的简化示例，仅供演示。</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Ecosystem & API -->
+    <section id="ecosystem" class="section py-24">
+      <div class="mx-auto max-w-7xl px-5">
+        <div class="flex items-end justify-between mb-10">
+          <h2 class="text-3xl md:text-4xl font-extrabold">生态与 API</h2>
+          <div class="text-slate-400 text-sm">工具、插件、工作流与平台</div>
+        </div>
+        <div class="grid lg:grid-cols-2 gap-8 items-start">
+          <div class="glass rounded-2xl p-6">
+            <div class="text-slate-300">快速上手</div>
+            <pre class="code mt-3 p-4"><code class="snippet">import OpenAI from "openai";
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+const completion = await client.chat.completions.create({
+  model: "gpt-4o-mini",
+  messages: [
+    { role: "system", content: "你是可靠的助理" },
+    { role: "user", content: "用一句话介绍 OpenAI" }
+  ]
+});
+console.log(completion.choices[0].message);</code></pre>
+            <div class="mt-4 grid sm:grid-cols-2 gap-3">
+              <div class="glass rounded-xl p-4">
+                <div class="text-slate-200 font-semibold">工具调用</div>
+                <div class="text-slate-400 text-sm mt-1">以结构化方式调用外部函数/插件。</div>
+              </div>
+              <div class="glass rounded-xl p-4">
+                <div class="text-slate-200 font-semibold">向量与检索</div>
+                <div class="text-slate-400 text-sm mt-1">结合检索增强生成（RAG）提升事实性。</div>
+              </div>
+              <div class="glass rounded-xl p-4">
+                <div class="text-slate-200 font-semibold">微调</div>
+                <div class="text-slate-400 text-sm mt-1">少量数据定制模型语气与领域。</div>
+              </div>
+              <div class="glass rounded-xl p-4">
+                <div class="text-slate-200 font-semibold">监控与成本</div>
+                <div class="text-slate-400 text-sm mt-1">可观测性与缓存策略优化成本。</div>
+              </div>
+            </div>
+          </div>
+          <div class="grid gap-6">
+            <div class="glass rounded-2xl p-6">
+              <div class="flex items-center gap-2">
+                <span class="iconify text-brand-300" data-icon="ph:graph-bold"></span>
+                <div class="font-semibold">示例工作流</div>
+              </div>
+              <ol class="list-decimal list-inside text-slate-300 mt-3 space-y-2">
+                <li>用户问题/指令进入路由</li>
+                <li>检索相关知识库（可选）</li>
+                <li>选择合适模型与上下文构造</li>
+                <li>调用工具或执行外部动作</li>
+                <li>输出结果并记录度量与成本</li>
+              </ol>
+            </div>
+            <div class="glass rounded-2xl p-6">
+              <div class="flex items-center gap-2">
+                <span class="iconify text-brand-300" data-icon="ph:cards-bold"></span>
+                <div class="font-semibold">集成场景</div>
+              </div>
+              <div class="mt-3 grid sm:grid-cols-2 gap-3">
+                <div class="glass rounded-xl p-4">客服自动化</div>
+                <div class="glass rounded-xl p-4">智能文档分析</div>
+                <div class="glass rounded-xl p-4">代码助手</div>
+                <div class="glass rounded-xl p-4">营销文案与设计</div>
+              </div>
+            </div>
+            <div class="glass rounded-2xl p-6">
+              <div class="flex items-center gap-2">
+                <span class="iconify text-brand-300" data-icon="ph:check-circle-bold"></span>
+                <div class="font-semibold">实践建议</div>
+              </div>
+              <ul class="mt-3 text-slate-300 space-y-2">
+                <li>采用系统提示与模板化上下文</li>
+                <li>对关键步骤进行可观测与回放</li>
+                <li>在生产前开展红队与评测</li>
+                <li>结合缓存、分级模型降低成本</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quotes -->
+    <section id="quotes" class="section py-24">
+      <div class="mx-auto max-w-7xl px-5">
+        <h2 class="text-3xl md:text-4xl font-extrabold mb-10">社区观点</h2>
+        <div class="grid md:grid-cols-3 gap-6">
+          <div class="glass rounded-2xl p-6 tilt" data-tilt>
+            <div class="tilt-inner">
+              <div class="text-slate-300">“AI 正在重构人机交互方式。”</div>
+              <div class="mt-4 text-xs text-slate-500">— 设计从业者</div>
+            </div>
+          </div>
+          <div class="glass rounded-2xl p-6 tilt" data-tilt>
+            <div class="tilt-inner">
+              <div class="text-slate-300">“从创意到实现的距离被显著缩短。”</div>
+              <div class="mt-4 text-xs text-slate-500">— 创业者</div>
+            </div>
+          </div>
+          <div class="glass rounded-2xl p-6 tilt" data-tilt>
+            <div class="tilt-inner">
+              <div class="text-slate-300">“开发流程正在演进为人机协作。”</div>
+              <div class="mt-4 text-xs text-slate-500">— 工程师</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section id="cta" class="section py-24">
+      <div class="mx-auto max-w-4xl px-5">
+        <div class="glass rounded-3xl p-10 text-center border-gradient">
+          <h2 class="text-3xl md:text-4xl font-extrabold">启程：与智能共同构建未来</h2>
+          <p class="text-slate-300 mt-4">从原型到生产，OpenAI 模型与生态助力你的愿景落地。</p>
+          <div class="mt-8 flex flex-wrap gap-3 justify-center">
+            <a href="#ecosystem" class="btn-primary px-6 py-3 rounded-xl font-semibold">查看 API 示例</a>
+            <a href="#models" class="glass px-6 py-3 rounded-xl border border-white/10">了解模型能力</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="py-10">
+      <div class="divider mb-8"></div>
+      <div class="mx-auto max-w-7xl px-5 text-slate-500 text-sm flex flex-col md:flex-row items-center justify-between gap-4">
+        <div>© <span id="year"></span> Horizon Alpha · OpenAI 概览</div>
+        <div class="flex items-center gap-4">
+          <a class="hover:text-slate-300" href="#about">关于</a>
+          <a class="hover:text-slate-300" href="#timeline">历程</a>
+          <a class="hover:text-slate-300" href="#models">模型</a>
+          <a class="hover:text-slate-300" href="#ecosystem">生态</a>
+        </div>
+      </div>
+    </footer>
+  </main>
+
+  <script>
+    // Year
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    // Copy button
+    const copyBtn = document.getElementById('copy-code');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', async () => {
+        const text = document.getElementById('policy-snippet').textContent;
+        try {
+          await navigator.clipboard.writeText(text);
+          copyBtn.textContent = '已复制';
+          setTimeout(() => copyBtn.textContent = '复制', 1200);
+        } catch {
+          copyBtn.textContent = '复制失败';
+          setTimeout(() => copyBtn.textContent = '复制', 1200);
+        }
+      });
+    }
+
+    // AOS init
+    window.addEventListener('load', () => {
+      if (window.AOS) AOS.init({ once: true, duration: 700, easing: 'ease-out-cubic' });
+    });
+
+    // Tilt effect
+    function attachTilt(el) {
+      const inner = el.querySelector('.tilt-inner');
+      if (!inner) return;
+      let rect;
+      const max = 10;
+      const reset = () => { el.style.transform = 'perspective(800px) rotateX(0) rotateY(0)'; };
+      el.addEventListener('mouseenter', () => { rect = el.getBoundingClientRect(); });
+      el.addEventListener('mousemove', (e) => {
+        const x = (e.clientX - rect.left) / rect.width;
+        const y = (e.clientY - rect.top) / rect.height;
+        const rx = (0.5 - y) * max;
+        const ry = (x - 0.5) * max;
+        el.style.transform = `perspective(800px) rotateX(${rx}deg) rotateY(${ry}deg)`;
+      });
+      el.addEventListener('mouseleave', () => { reset(); });
+    }
+    document.querySelectorAll('[data-tilt]').forEach(attachTilt);
+
+    // Three.js particles (lightweight, adaptive)
+    // Guard: wait until THREE is present for sure
+    function initParticles() {
+      const canvas = document.getElementById('bg-particles');
+      if (!canvas) return;
+      const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const isMobile = window.matchMedia('(max-width: 768px)').matches;
+      const count = prefersReduced ? 0 : (isMobile ? 80 : 140);
+
+      const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.6));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 1000);
+      camera.position.z = 180;
+
+      const geometry = new THREE.BufferGeometry();
+      const positions = new Float32Array(count * 3);
+      const speeds = new Float32Array(count);
+
+      for (let i = 0; i < count; i++) {
+        positions[i*3] = (Math.random() - 0.5) * 600;
+        positions[i*3+1] = (Math.random() - 0.5) * 400;
+        positions[i*3+2] = (Math.random() - 0.5) * 300;
+        speeds[i] = 0.05 + Math.random() * 0.15;
+      }
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+      const material = new THREE.PointsMaterial({
+        color: 0x88b4ff,
+        size: 1.8,
+        transparent: true,
+        opacity: 0.75,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+      const points = new THREE.Points(geometry, material);
+      scene.add(points);
+
+      const mouse = { x: 0, y: 0 };
+      window.addEventListener('mousemove', (e) => {
+        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      }, { passive: true });
+
+      function animate() {
+        requestAnimationFrame(animate);
+        const pos = geometry.attributes.position.array;
+        for (let i = 0; i < count; i++) {
+          pos[i*3+1] += speeds[i] * 0.3;
+          if (pos[i*3+1] > 220) pos[i*3+1] = -220;
+        }
+        geometry.attributes.position.needsUpdate = true;
+        camera.position.x += (mouse.x * 20 - camera.position.x) * 0.03;
+        camera.position.y += (mouse.y * 10 - camera.position.y) * 0.03;
+        camera.lookAt(scene.position);
+        renderer.render(scene, camera);
+      }
+      if (count > 0) animate();
+
+      window.addEventListener('resize', () => {
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+      });
+    }
+    // Ensure THREE exists before init; if not, retry after load and next tick
+    function safeInitParticles() {
+      if (window.THREE) {
+        initParticles();
+      } else {
+        // try again on next tick (handles slow CDN)
+        setTimeout(() => {
+          if (window.THREE) initParticles();
+        }, 50);
+      }
+    }
+    if (document.readyState === 'complete') {
+      safeInitParticles();
+    } else {
+      window.addEventListener('load', safeInitParticles);
+    }
+
+    // Native scroll behaviors (no third-party smooth scroll to keep anchors working)
+    function initNativeScroll() {
+      // Parallax using native scroll + requestAnimationFrame
+      const parallaxEls = Array.from(document.querySelectorAll('.parallax'));
+      let ticking = false;
+      const maxShift = 180; // clamp movement to avoid too subtle or too big
+      const onScroll = () => {
+        if (ticking) return;
+        ticking = true;
+        requestAnimationFrame(() => {
+          const y = window.scrollY || window.pageYOffset;
+          parallaxEls.forEach(el => {
+            const speed = parseFloat(el.getAttribute('data-speed') || '0.2');
+            const shift = Math.max(-maxShift, Math.min(maxShift, y * speed));
+            el.style.transform = `translate3d(0, ${shift}px, 0)`;
+          });
+          ticking = false;
+        });
+      };
+      window.addEventListener('scroll', onScroll, { passive: true });
+      // Also update on load and after a slight delay to ensure correct initial position
+      onScroll();
+      setTimeout(onScroll, 50);
+
+      // Active nav link based on sections in viewport
+      const links = Array.from(document.querySelectorAll('.nav-link'));
+      const sections = links.map(a => document.querySelector(a.getAttribute('href')));
+      const updateActive = () => {
+        const y = (window.scrollY || window.pageYOffset) + window.innerHeight * 0.35;
+        let activeIndex = 0;
+        sections.forEach((sec, i) => {
+          if (!sec) return;
+          const top = sec.offsetTop;
+          if (y >= top) activeIndex = i;
+        });
+        links.forEach((l, i) => l.classList.toggle('active', i === activeIndex));
+      };
+      window.addEventListener('scroll', updateActive, { passive: true });
+      window.addEventListener('resize', updateActive);
+      updateActive();
+
+      // Smooth anchor scrolling with native behavior
+      document.querySelectorAll('a[href^="#"]').forEach(a => {
+        a.addEventListener('click', (e) => {
+          const id = a.getAttribute('href');
+          const target = document.querySelector(id);
+          if (!target) return;
+          e.preventDefault();
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          history.pushState(null, '', id);
+        });
+      });
+    }
+    window.addEventListener('load', initNativeScroll);
+
+    // GSAP micro animations
+    function microAnims() {
+      if (!window.gsap) return;
+      gsap.utils.toArray('.glass').forEach((el, i) => {
+        gsap.from(el, {
+          opacity: 0,
+          y: 20,
+          duration: 0.6,
+          delay: i * 0.02,
+          ease: 'power2.out',
+          scrollTrigger: window.ScrollTrigger ? { trigger: el, start: 'top 85%' } : undefined
+        });
+      });
+    }
+    window.addEventListener('load', microAnims);
+  </script>
+</body>
+</html>

@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <title>玻璃雨滴物理模拟</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #0f1117;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, PingFang SC,
+          Microsoft Yahei, Helvetica, Arial, sans-serif;
+      }
+      #wrap {
+        position: fixed;
+        inset: 0;
+      }
+      canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      /* 控制面板 */
+      #ui {
+        position: fixed;
+        left: 12px;
+        top: 12px;
+        background: rgba(20, 22, 30, 0.65);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
+        backdrop-filter: blur(10px);
+        color: #e6e6e6;
+        padding: 10px 12px;
+        min-width: 260px;
+        z-index: 10;
+        user-select: none;
+      }
+      #ui h2 {
+        margin: 4px 0 6px;
+        font-size: 14px;
+        font-weight: 600;
+        color: #cdd6f4;
+        letter-spacing: 0.2px;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 110px 1fr 56px;
+        gap: 8px;
+        align-items: center;
+        margin: 6px 0;
+      }
+      .row label {
+        font-size: 12px;
+        color: #aab2c0;
+      }
+      .row input[type="range"] {
+        width: 100%;
+      }
+      .val {
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+        font-size: 12px;
+        color: #cfd7e6;
+        opacity: 0.9;
+      }
+      .bar {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+      }
+      button {
+        background: #2a2f3b;
+        color: #e8ecf3;
+        border: 1px solid #3a4150;
+        border-radius: 8px;
+        padding: 6px 10px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #323848;
+      }
+      #fps {
+        position: fixed;
+        right: 12px;
+        top: 12px;
+        color: #cfd7e6;
+        background: rgba(0, 0, 0, 0.35);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 8px;
+        padding: 6px 8px;
+        font-size: 12px;
+        z-index: 10;
+      }
+      /* 玻璃背景微妙纹理 */
+      #bg {
+        background: radial-gradient(
+            1200px 800px at 10% 10%,
+            rgba(255, 255, 255, 0.06),
+            rgba(0, 0, 0, 0) 60%
+          ),
+          radial-gradient(
+            1000px 700px at 80% 20%,
+            rgba(255, 255, 255, 0.05),
+            rgba(0, 0, 0, 0) 60%
+          ),
+          linear-gradient(120deg, #0e1016 0%, #121521 40%, #0f1420 100%);
+        filter: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="wrap">
+      <canvas id="bg"></canvas>
+      <!-- 上层：可见雨滴合成（含折射近似与拖尾） -->
+      <canvas id="view"></canvas>
+    </div>
+
+    <div id="ui">
+      <h2>参数调节</h2>
+
+      <div class="row">
+        <label>风向 (°)</label>
+        <input
+          id="windDir"
+          type="range"
+          min="-180"
+          max="180"
+          step="1"
+          value="-20"
+        />
+        <div class="val" id="windDirVal"></div>
+      </div>
+
+      <div class="row">
+        <label>风速</label>
+        <input
+          id="windSpeed"
+          type="range"
+          min="0"
+          max="800"
+          step="10"
+          value="220"
+        />
+        <div class="val" id="windSpeedVal"></div>
+      </div>
+
+      <div class="row">
+        <label>重力</label>
+        <input
+          id="gravity"
+          type="range"
+          min="100"
+          max="3000"
+          step="10"
+          value="1500"
+        />
+        <div class="val" id="gravityVal"></div>
+      </div>
+
+      <div class="row">
+        <label>表面摩擦</label>
+        <input
+          id="friction"
+          type="range"
+          min="0"
+          max="1"
+          step="0.01"
+          value="0.12"
+        />
+        <div class="val" id="frictionVal"></div>
+      </div>
+
+      <div class="row">
+        <label>黏附阈值</label>
+        <input
+          id="adhesion"
+          type="range"
+          min="0"
+          max="1"
+          step="0.01"
+          value="0.25"
+        />
+        <div class="val" id="adhesionVal"></div>
+      </div>
+
+      <div class="row">
+        <label>生成速率</label>
+        <input
+          id="spawnRate"
+          type="range"
+          min="0"
+          max="200"
+          step="1"
+          value="90"
+        />
+        <div class="val" id="spawnRateVal"></div>
+      </div>
+
+      <div class="row">
+        <label>折射/模糊</label>
+        <input
+          id="blurStrength"
+          type="range"
+          min="0"
+          max="1"
+          step="0.01"
+          value="0.55"
+        />
+        <div class="val" id="blurStrengthVal"></div>
+      </div>
+
+      <div class="bar">
+        <button id="reset">重置</button>
+        <button id="pause">暂停</button>
+      </div>
+      <p>由horizon-alpha制作</p>
+    </div>
+
+    <div id="fps">FPS</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js"></script>
+    <script>
+      (() => {
+        const bg = document.getElementById("bg");
+        const view = document.getElementById("view");
+        const bgCtx = bg.getContext("2d", { alpha: false });
+        const vCtx = view.getContext("2d");
+
+        let W = 0,
+          H = 0,
+          dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+
+        function resize() {
+          const rect = document.body.getBoundingClientRect();
+          W = Math.floor(rect.width);
+          H = Math.floor(rect.height);
+          for (const c of [bg, view]) {
+            c.width = Math.floor(W * dpr);
+            c.height = Math.floor(H * dpr);
+            c.style.width = W + "px";
+            c.style.height = H + "px";
+          }
+          bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          vCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          drawBackground();
+        }
+        window.addEventListener("resize", resize, { passive: true });
+        resize();
+
+        function drawBackground() {
+          // 已在 CSS 使用渐变，这里可叠加少量噪声纹理
+          const step = 32;
+          bgCtx.clearRect(0, 0, W, H);
+          for (let y = 0; y < H; y += step) {
+            for (let x = 0; x < W; x += step) {
+              const n = (Math.sin(x * 0.013) + Math.cos(y * 0.017)) * 0.5 + 0.5;
+              const a = 6 + Math.floor(n * 10);
+              bgCtx.fillStyle = `rgba(255,255,255,${(a / 255) * 0.08})`;
+              bgCtx.fillRect(x, y, step, step);
+            }
+          }
+        }
+
+        const params = {
+          windDirDeg: -20,
+          windSpeed: 220, // px/s
+          gravity: 1500, // px/s^2
+          friction: 0.12, // 表面切向阻尼（影响速度阻尼）
+          adhesion: 0.25, // 黏附阈值: 低速时更易停滞/合并
+          spawnRate: 90, // 每秒生成尝试数
+          blurStrength: 0.55, // 折射/模糊混合强度
+        };
+
+        // 绑定 UI
+        const bind = (id, key, fmt = (v) => v) => {
+          const el = document.getElementById(id);
+          const val = document.getElementById(id + "Val");
+          const update = () => {
+            let v = el.value;
+            const num = Number(v);
+            params[key] = isNaN(num) ? v : num;
+            val.textContent = fmt(params[key]);
+          };
+          el.addEventListener("input", update);
+          update();
+        };
+        bind("windDir", "windDirDeg", (v) => v.toFixed(0) + "°");
+        bind("windSpeed", "windSpeed", (v) => v.toFixed(0));
+        bind("gravity", "gravity", (v) => {
+          // 更新引擎重力，确保滑杆变动立刻可见
+          engine.gravity.y = Math.max(0.2, Math.min(2.0, Number(v) / 1600));
+          return Number(v).toFixed(0);
+        });
+        bind("friction", "friction", (v) => v.toFixed(2));
+        bind("adhesion", "adhesion", (v) => v.toFixed(2));
+        bind("spawnRate", "spawnRate", (v) => v.toFixed(0));
+        bind("blurStrength", "blurStrength", (v) => v.toFixed(2));
+
+        document.getElementById("reset").addEventListener("click", () => {
+          // 清空物理世界中的所有雨滴
+          for (const b of drops) {
+            try {
+              Matter.World.remove(world, b);
+            } catch (_) {}
+          }
+          drops.length = 0;
+        });
+        let paused = false;
+        document.getElementById("pause").addEventListener("click", (e) => {
+          paused = !paused;
+          e.target.textContent = paused ? "继续" : "暂停";
+        });
+
+        // 使用 matter-js 物理
+        const { Engine, World, Bodies, Body, Events } = Matter;
+        const engine = Engine.create({ enableSleeping: true });
+        // 重力：将 UI 的 px/s^2 映射为 Matter 的重力比例（经验映射）
+        // 让默认 gravity=1500 时接近 0.9，视觉上明显下坠
+        engine.gravity.x = 0;
+        const mapGravity = (g) => Math.max(0.2, Math.min(2.0, g / 1600));
+        engine.gravity.y = mapGravity(params.gravity);
+        const world = engine.world;
+
+        const drops = [];
+        let maxDrops = 600;
+
+        function spawn(dt) {
+          // 控制总数，防止无限增长
+          const target = params.spawnRate * dt;
+          let n = Math.floor(target);
+          if (Math.random() < target - n) n++;
+          for (let i = 0; i < n; i++) {
+            if (drops.length >= maxDrops) break;
+            const r = 2 + Math.random() * 5 + Math.random() * 8; // 2-15px
+            const x = Math.random() * W;
+            const y = -40 - Math.random() * 40;
+            const body = Bodies.circle(x, y, r, {
+              frictionAir: 0.01 + (1 - params.friction) * 0.06,
+              friction: 0.02,
+              restitution: 0.03,
+              inertia: Infinity, // 禁用旋转影响
+              sleepThreshold: 30,
+            });
+            body.plugin = { r, trail: [] };
+            const dir = (params.windDirDeg * Math.PI) / 180;
+            const ws = params.windSpeed * (0.2 + Math.random() * 0.8);
+            // 初速度：加大下向分量，确保入场即可可见下落
+            Body.setVelocity(body, {
+              x: Math.cos(dir) * ws * 0.025,
+              y: Math.sin(dir) * ws * 0.025 + 5,
+            });
+            World.add(world, body);
+            drops.push(body);
+          }
+        }
+
+        function applyForces(dt) {
+          // 风力：稍微增大系数，保证可见水平/斜向流动
+          const dir = (params.windDirDeg * Math.PI) / 180;
+          const wx = Math.cos(dir) * params.windSpeed * 3e-4;
+          const wy = Math.sin(dir) * params.windSpeed * 3e-4;
+          for (const b of drops) {
+            if (b.isSleeping) continue;
+            const mass = b.mass || 1;
+            Body.applyForce(b, b.position, { x: wx * mass, y: wy * mass });
+            // 轻微速度阻尼，防止速度无限增大，同时不至于“刹停”
+            const v = b.velocity;
+            const k = Math.min(0.6, params.friction * dt); // 降低阻尼强度
+            Body.setVelocity(b, { x: v.x * (1 - k), y: v.y * (1 - k) });
+          }
+        }
+
+        // 合并：在低相对速度碰撞时将小滴并入大滴
+        // 防御性：合并流程防止在同一 tick 内对已移除的 body 再操作
+        let merging = false;
+        Events.on(engine, "collisionStart", (evt) => {
+          if (merging) return;
+          merging = true;
+          try {
+            const toRemove = new Set();
+            const toAdd = [];
+            for (const pair of evt.pairs) {
+              const a = pair.bodyA,
+                b = pair.bodyB;
+              if (!a.plugin || !b.plugin) continue;
+              if (toRemove.has(a) || toRemove.has(b)) continue;
+              const va = a.velocity,
+                vb = b.velocity;
+              const rel = Math.hypot(va.x - vb.x, va.y - vb.y);
+              const threshold = 6 * (0.2 + (1 - params.adhesion));
+              if (rel > threshold) continue;
+
+              const A = (a.plugin.r || a.circleRadius) ** 2 * Math.PI;
+              const B = (b.plugin.r || b.circleRadius) ** 2 * Math.PI;
+              const big = A >= B ? a : b;
+              const small = big === a ? b : a;
+
+              const massBig = big.mass || 1,
+                massSmall = small.mass || 1;
+              const vx =
+                (big.velocity.x * massBig + small.velocity.x * massSmall) /
+                (massBig + massSmall);
+              const vy =
+                (big.velocity.y * massBig + small.velocity.y * massSmall) /
+                (massBig + massSmall);
+              const px =
+                (big.position.x * massBig + small.position.x * massSmall) /
+                (massBig + massSmall);
+              const py =
+                (big.position.y * massBig + small.position.y * massSmall) /
+                (massBig + massSmall);
+
+              const newArea = A + B;
+              const newR = Math.max(
+                1.5,
+                Math.min(60, Math.sqrt(newArea / Math.PI))
+              );
+
+              const mergedTrail = (big.plugin.trail || [])
+                .concat(small.plugin.trail || [])
+                .slice(-10);
+
+              toRemove.add(big);
+              toRemove.add(small);
+              const nb = Bodies.circle(px, py, newR, {
+                frictionAir: big.frictionAir ?? 0.02,
+                restitution: 0.02,
+                inertia: Infinity,
+                sleepThreshold: 30,
+              });
+              nb.plugin = { r: newR, trail: mergedTrail };
+              Body.setVelocity(nb, { x: vx * 1.12, y: vy * 1.12 });
+              toAdd.push(nb);
+            }
+
+            if (toRemove.size || toAdd.length) {
+              for (const b of toRemove) {
+                try {
+                  World.remove(world, b);
+                } catch (_) {}
+                const idx = drops.indexOf(b);
+                if (idx >= 0) drops.splice(idx, 1);
+              }
+              for (const nb of toAdd) {
+                World.add(world, nb);
+                drops.push(nb);
+              }
+            }
+          } finally {
+            merging = false;
+          }
+        });
+
+        // 折射近似：多次偏移拷贝背景
+        function drawRefraction() {
+          vCtx.globalCompositeOperation = "source-over";
+          vCtx.drawImage(bg, 0, 0);
+          const layers = 3;
+          const strength = 6 * params.blurStrength;
+          for (let i = 0; i < layers; i++) {
+            const w = (i / (layers - 1) - 0.5) * 2; // [-1,1]
+            const ox = strength * w;
+            const oy = strength * (0.6 - Math.abs(w)) * 0.6;
+            vCtx.globalAlpha = 0.14 + 0.1 * (1 - Math.abs(w));
+            vCtx.globalCompositeOperation = "screen";
+            vCtx.drawImage(bg, ox, oy);
+          }
+          vCtx.globalAlpha = 1;
+          vCtx.globalCompositeOperation = "source-over";
+        }
+
+        // 拖尾淡化：destination-out 轻微擦除上一帧痕迹
+        function fadeTrails() {
+          vCtx.save();
+          vCtx.globalCompositeOperation = "destination-out";
+          // 再降低淡出强度，避免把刚画出的细滴痕迹抹掉导致“看不见”
+          vCtx.fillStyle = "rgba(0,0,0,0.045)";
+          vCtx.fillRect(0, 0, W, H);
+          vCtx.restore();
+        }
+
+        function drawDropsAndTrails() {
+          // 更新 trail
+          for (const b of drops) {
+            const p = b.position;
+            const tr = b.plugin.trail;
+            tr.push({ x: p.x, y: p.y });
+            if (tr.length > 10) tr.shift();
+          }
+
+          // 画 trail
+          vCtx.save();
+          vCtx.globalCompositeOperation = "lighter";
+          vCtx.lineCap = "round";
+          vCtx.lineJoin = "round";
+          for (const b of drops) {
+            const r = b.circleRadius || b.plugin.r;
+            const tr = b.plugin.trail;
+            if (!tr || tr.length < 2) continue;
+            for (let i = 1; i < tr.length; i++) {
+              const a = tr[i - 1],
+                c = tr[i];
+              const t = i / tr.length;
+              vCtx.strokeStyle = `rgba(200,220,255,${0.06 * t})`;
+              vCtx.lineWidth = Math.max(1, r * 0.6 * t);
+              vCtx.beginPath();
+              vCtx.moveTo(a.x, a.y);
+              vCtx.lineTo(c.x, c.y);
+              vCtx.stroke();
+            }
+          }
+          vCtx.restore();
+
+          // 画主体与轮廓高光
+          vCtx.save();
+          for (const b of drops) {
+            const r = b.circleRadius || b.plugin.r;
+            const x = b.position.x,
+              y = b.position.y;
+            const g = vCtx.createRadialGradient(
+              x - r * 0.4,
+              y - r * 0.4,
+              r * 0.1,
+              x,
+              y,
+              r * 1.2
+            );
+            g.addColorStop(0, "rgba(255,255,255,0.35)");
+            g.addColorStop(0.4, "rgba(255,255,255,0.18)");
+            g.addColorStop(1, "rgba(255,255,255,0.02)");
+            vCtx.fillStyle = g;
+            vCtx.beginPath();
+            vCtx.arc(x, y, r, 0, Math.PI * 2);
+            vCtx.fill();
+
+            vCtx.strokeStyle = "rgba(255,255,255,0.12)";
+            vCtx.lineWidth = 1;
+            vCtx.beginPath();
+            vCtx.arc(x, y, r, 0, Math.PI * 2);
+            vCtx.stroke();
+          }
+          vCtx.restore();
+        }
+
+        // 合成与折射
+        function renderView() {
+          // 基底折射
+          drawRefraction();
+          // 拖尾淡化
+          fadeTrails();
+          // 叠加轨迹与主体
+          drawDropsAndTrails();
+        }
+
+        // 主循环
+        let last = performance.now();
+        let fpsLast = last,
+          frames = 0;
+        const fpsEl = document.getElementById("fps");
+
+        function loop(t) {
+          requestAnimationFrame(loop);
+          if (paused) {
+            last = t;
+            return;
+          }
+          const dt = Math.min(0.033, Math.max(0.001, (t - last) / 1000));
+          last = t;
+
+          // 自适应上限：适当提升上限，防止看起来“太稀”
+          maxDrops = Math.min(
+            1200,
+            Math.floor(((W * H) / (1200 * 900)) * 700 + 350)
+          );
+
+          // 低 FPS 自适应：降低生成速率
+          const elapsed = t - fpsLast;
+          frames++;
+          if (elapsed >= 500) {
+            const fps = Math.round((frames * 1000) / elapsed);
+            // 显示
+            fpsEl.textContent = `FPS: ${fps}  |  Drops: ${drops.length}`;
+            // 按 FPS 自适应生成率
+            if (fps < 50)
+              params.spawnRate = Math.max(20, params.spawnRate * 0.9);
+            else if (fps > 70)
+              params.spawnRate = Math.min(200, params.spawnRate * 1.02);
+            fpsLast = t;
+            frames = 0;
+          }
+
+          // 控制更新步长，防止长时间切换标签导致巨帧数值爆炸
+          const substeps = Math.max(1, Math.min(2, Math.ceil(dt / 0.018)));
+          const h = dt / substeps;
+          for (let i = 0; i < substeps; i++) {
+            spawn(h);
+            applyForces(h);
+            Matter.Engine.update(engine, h * 1000);
+          }
+
+          // 回收出屏或异常数值的 body
+          for (let i = drops.length - 1; i >= 0; i--) {
+            const b = drops[i];
+            const r = b.circleRadius || b.plugin.r || 2;
+            const x = b.position.x,
+              y = b.position.y;
+            if (
+              !isFinite(x) ||
+              !isFinite(y) ||
+              !isFinite(r) ||
+              r <= 0 ||
+              y - r > H + 120 ||
+              x + r < -120 ||
+              x - r > W + 120
+            ) {
+              try {
+                Matter.World.remove(world, b);
+              } catch (_) {}
+              drops.splice(i, 1);
+            }
+          }
+
+          renderView();
+        }
+        requestAnimationFrame(loop);
+      })();
+    </script>
+  </body>
+</html>

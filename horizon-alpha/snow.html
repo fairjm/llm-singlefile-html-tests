@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>下雪场景演示 - 可控雪量/风速/方向与堆积</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Importmap for Tailwind (standalone CDN build) -->
+    <script type="importmap">
+      {
+        "imports": {
+          "tailwindcss": "https://cdn.jsdelivr.net/npm/tailwindcss@3.4.10/lib/index.js"
+        }
+      }
+    </script>
+    <!-- Tailwind CDN runtime loader -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      :root {
+        --panel-bg: rgba(15, 15, 20, 0.7);
+        --panel-border: rgba(255, 255, 255, 0.15);
+        --text: #eaf1ff;
+        --accent: #60a5fa;
+        --accent-2: #a78bfa;
+        --ground: #dfe7f7;
+      }
+      html,
+      body {
+        height: 100%;
+        background: radial-gradient(
+          1200px 800px at 70% -10%,
+          #2a3456 0%,
+          #0b1224 60%,
+          #070b18 100%
+        );
+        color: var(--text);
+        overflow: hidden;
+      }
+      /* Scene layers */
+      #scene {
+        position: relative;
+        width: 100%;
+        height: 100%;
+      }
+      /* Snow canvas on top, click/pointer allowed to pass to UI */
+      #snow-canvas {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 5;
+      }
+      /* Accumulation canvas below snow animation to "paint" the settled snow */
+      #accum-canvas {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 2;
+      }
+      /* UI panel */
+      .panel {
+        position: absolute;
+        right: 1rem;
+        top: 1rem;
+        z-index: 10;
+        background: var(--panel-bg);
+        border: 1px solid var(--panel-border);
+        backdrop-filter: blur(8px);
+        border-radius: 0.75rem;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      }
+      .panel h2 {
+        font-weight: 700;
+        letter-spacing: 0.02em;
+      }
+      .label {
+        font-size: 0.8rem;
+        opacity: 0.85;
+      }
+      .range {
+        appearance: none;
+        width: 100%;
+        height: 6px;
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 9999px;
+        outline: none;
+      }
+      .range::-webkit-slider-thumb {
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        border-radius: 50%;
+        border: 2px solid rgba(255, 255, 255, 0.7);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        cursor: pointer;
+        transition: transform 0.12s ease;
+      }
+      .range:active::-webkit-slider-thumb {
+        transform: scale(1.05);
+      }
+      .value-badge {
+        min-width: 2.2rem;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        color: #dbeafe;
+      }
+      /* Ground area */
+      .ground {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 18%;
+        z-index: 1;
+        background: linear-gradient(
+            180deg,
+            rgba(255, 255, 255, 0.2),
+            rgba(200, 220, 255, 0.15),
+            rgba(255, 255, 255, 0.1)
+          ),
+          radial-gradient(
+            100% 100% at 50% 10%,
+            rgba(255, 255, 255, 0.35),
+            rgba(255, 255, 255, 0) 60%
+          ),
+          linear-gradient(
+            180deg,
+            rgba(255, 255, 255, 0.1),
+            rgba(220, 230, 255, 0.2)
+          ),
+          #cfd9ee;
+        border-top-left-radius: 30% 40%;
+        border-top-right-radius: 30% 40%;
+        filter: blur(0.2px);
+        box-shadow: inset 0 10px 30px rgba(255, 255, 255, 0.12);
+      }
+
+      /* Random generated elements */
+      .element {
+        position: absolute;
+        border-radius: 0.5rem;
+        background: linear-gradient(
+          160deg,
+          rgba(255, 255, 255, 0.7),
+          rgba(220, 230, 255, 0.35)
+        );
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35),
+          inset 0 1px 0 rgba(255, 255, 255, 0.4);
+        backdrop-filter: blur(3px);
+        z-index: 3;
+        overflow: hidden;
+      }
+      .element::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(
+          120% 100% at 20% 0%,
+          rgba(255, 255, 255, 0.35),
+          rgba(255, 255, 255, 0.05) 45%,
+          rgba(255, 255, 255, 0) 65%
+        );
+        mix-blend-mode: screen;
+        pointer-events: none;
+      }
+      .element .title {
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: #10213a;
+        letter-spacing: 0.02em;
+        padding: 6px 10px;
+        background: rgba(255, 255, 255, 0.55);
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+      }
+      .element .content {
+        padding: 8px 10px 14px;
+        color: #1e293b;
+        font-size: 0.8rem;
+      }
+      /* Title banner */
+      .title-banner {
+        position: absolute;
+        left: 1rem;
+        top: 1rem;
+        z-index: 9;
+        user-select: none;
+        background: linear-gradient(
+          90deg,
+          rgba(96, 165, 250, 0.18),
+          rgba(167, 139, 250, 0.18)
+        );
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        padding: 10px 14px;
+        border-radius: 10px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+        backdrop-filter: blur(6px);
+      }
+      .title-banner h1 {
+        font-size: 1.1rem;
+        letter-spacing: 0.04em;
+      }
+      .title-banner .sub {
+        font-size: 0.78rem;
+        opacity: 0.85;
+      }
+      /* Parallax stars */
+      .stars,
+      .stars2,
+      .stars3 {
+        position: absolute;
+        inset: 0;
+        background-repeat: repeat;
+        z-index: 0;
+        opacity: 0.4;
+        pointer-events: none;
+      }
+      /* Will be filled procedurally to data-urls */
+      .stars {
+        opacity: 0.35;
+      }
+      .stars2 {
+        opacity: 0.25;
+      }
+      .stars3 {
+        opacity: 0.15;
+      }
+
+      /* Buttons */
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.45rem 0.7rem;
+        border-radius: 0.6rem;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.1),
+          rgba(255, 255, 255, 0.02)
+        );
+        color: var(--text);
+        transition: transform 0.12s ease, background 0.2s ease;
+        cursor: pointer;
+        user-select: none;
+      }
+      .btn:hover {
+        transform: translateY(-1px);
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.14),
+          rgba(255, 255, 255, 0.04)
+        );
+      }
+      .btn:active {
+        transform: translateY(0px) scale(0.99);
+      }
+
+      /* Accumulation hint overlay */
+      .hint {
+        position: absolute;
+        bottom: calc(18% + 16px);
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 8px 12px;
+        background: rgba(0, 0, 0, 0.35);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 8px;
+        font-size: 0.8rem;
+        z-index: 6;
+        opacity: 0;
+        transition: opacity 0.5s ease;
+        pointer-events: none;
+      }
+      .hint.show {
+        opacity: 1;
+      }
+
+      /* Range group layout */
+      .row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 0.75rem;
+        align-items: center;
+      }
+      .row + .row {
+        margin-top: 0.75rem;
+      }
+
+      /* Footer credit */
+      .credit {
+        position: absolute;
+        right: 1rem;
+        bottom: 1rem;
+        z-index: 8;
+        font-size: 0.75rem;
+        opacity: 0.65;
+        background: rgba(255, 255, 255, 0.06);
+        padding: 6px 10px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        backdrop-filter: blur(6px);
+      }
+    </style>
+  </head>
+  <body class="antialiased">
+    <div id="scene" class="w-full h-full">
+      <!-- Stars parallax (procedural textures) -->
+      <div class="stars"></div>
+      <div class="stars2"></div>
+      <div class="stars3"></div>
+
+      <!-- Random generated elements container -->
+      <div id="elements"></div>
+
+      <!-- Accumulation and Snow layer -->
+      <canvas id="accum-canvas"></canvas>
+      <canvas id="snow-canvas"></canvas>
+
+      <!-- Ground visual -->
+      <div class="ground"></div>
+
+      <!-- Title -->
+      <div class="title-banner">
+        <h1>下雪场景演示</h1>
+        <p>由horizon-alpha制作</p>
+        <div class="sub">
+          调节雪花密度、风速与方向；雪花会在地面和元素上堆积
+        </div>
+      </div>
+
+      <!-- UI Panel -->
+      <div class="panel p-4 w-80">
+        <h2 class="text-sky-200 mb-3">控制面板</h2>
+
+        <div class="space-y-3">
+          <div>
+            <div class="flex items-center justify-between">
+              <span class="label">雪花密度</span>
+              <span id="densityVal" class="value-badge">300</span>
+            </div>
+            <input
+              id="density"
+              class="range"
+              type="range"
+              min="50"
+              max="1200"
+              step="10"
+              value="300"
+            />
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between">
+              <span class="label">风速</span>
+              <span id="windVal" class="value-badge">1.0</span>
+            </div>
+            <input
+              id="wind"
+              class="range"
+              type="range"
+              min="0"
+              max="6"
+              step="0.1"
+              value="1.0"
+            />
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between">
+              <span class="label">风向 (°)</span>
+              <span id="dirVal" class="value-badge">20</span>
+            </div>
+            <input
+              id="direction"
+              class="range"
+              type="range"
+              min="-90"
+              max="90"
+              step="1"
+              value="20"
+            />
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between">
+              <span class="label">下落速度</span>
+              <span id="fallVal" class="value-badge">1.0</span>
+            </div>
+            <input
+              id="fall"
+              class="range"
+              type="range"
+              min="0.2"
+              max="2.0"
+              step="0.05"
+              value="1.0"
+            />
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 pt-1">
+            <button id="toggle" class="btn justify-center">暂停/继续</button>
+            <button id="reset" class="btn justify-center">重置积雪</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="hint" id="hint">雪花会在元素表面与地面逐渐堆积</div>
+
+      <div class="credit">示例 · 纯前端，无外部资产</div>
+    </div>
+
+    <script type="module">
+      // Tailwind is loaded via CDN; we also ensure the app is fully self-contained.
+
+      // Utilities
+      const rand = (a = 0, b = 1) => Math.random() * (b - a) + a;
+      const randInt = (a, b) => Math.floor(rand(a, b + 1));
+      const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+      const lerp = (a, b, t) => a + (b - a) * t;
+
+      const scene = document.getElementById("scene");
+      const snowCanvas = document.getElementById("snow-canvas");
+      const accumCanvas = document.getElementById("accum-canvas");
+      const ctx = snowCanvas.getContext("2d");
+      const aCtx = accumCanvas.getContext("2d");
+
+      // UI
+      const densityEl = document.getElementById("density");
+      const windEl = document.getElementById("wind");
+      const dirEl = document.getElementById("direction");
+      const dVal = document.getElementById("densityVal");
+      const wVal = document.getElementById("windVal");
+      const dirVal = document.getElementById("dirVal");
+      const toggleBtn = document.getElementById("toggle");
+      const resetBtn = document.getElementById("reset");
+      const hint = document.getElementById("hint");
+
+      // New: fall speed control
+      const fallEl = document.getElementById("fall");
+      const fallVal = document.getElementById("fallVal");
+
+      // Create procedural star textures
+      function makeStarsTexture(
+        size = 256,
+        count = 120,
+        min = 0.5,
+        max = 1.8,
+        color = "#cfe3ff"
+      ) {
+        const c = document.createElement("canvas");
+        c.width = c.height = size;
+        const cx = c.getContext("2d");
+        cx.fillStyle = "transparent";
+        cx.fillRect(0, 0, size, size);
+        for (let i = 0; i < count; i++) {
+          const x = Math.random() * size;
+          const y = Math.random() * size;
+          const r = rand(min, max);
+          const g = cx.createRadialGradient(x, y, 0, x, y, r);
+          const a = rand(0.4, 0.9);
+          g.addColorStop(0, `rgba(255,255,255,${a})`);
+          g.addColorStop(0.6, `rgba(200,220,255,${a * 0.4})`);
+          g.addColorStop(1, `rgba(255,255,255,0)`);
+          cx.fillStyle = g;
+          cx.beginPath();
+          cx.arc(x, y, r, 0, Math.PI * 2);
+          cx.fill();
+        }
+        return c.toDataURL();
+      }
+
+      function applyStars() {
+        const s1 = makeStarsTexture(256, 60, 0.4, 1.4);
+        const s2 = makeStarsTexture(256, 40, 0.6, 1.8);
+        const s3 = makeStarsTexture(256, 30, 0.8, 1.8);
+        const e1 = document.querySelector(".stars");
+        const e2 = document.querySelector(".stars2");
+        const e3 = document.querySelector(".stars3");
+        e1.style.backgroundImage = `url(${s1})`;
+        e2.style.backgroundImage = `url(${s2})`;
+        e3.style.backgroundImage = `url(${s3})`;
+        e1.style.backgroundSize = "256px 256px";
+        e2.style.backgroundSize = "384px 384px";
+        e3.style.backgroundSize = "512px 512px";
+      }
+
+      // Random elements generation
+      const elementsContainer = document.getElementById("elements");
+      let elements = [];
+      function createRandomElements() {
+        const count = 6;
+        const pad = 40;
+        const W = scene.clientWidth;
+        const H = scene.clientHeight;
+        const groundTop = H * (1 - 0.18);
+        elements = [];
+
+        for (let i = 0; i < count; i++) {
+          const w = randInt(120, 220);
+          const h = randInt(70, 140);
+          const x = randInt(pad, Math.max(pad, W - w - pad));
+          const yMax = Math.max(pad, groundTop - h - 20);
+          const y = randInt(pad + 30, yMax);
+
+          const el = document.createElement("div");
+          el.className = "element";
+          el.style.left = x + "px";
+          el.style.top = y + "px";
+          el.style.width = w + "px";
+          el.style.height = h + "px";
+
+          // content
+          const t = document.createElement("div");
+          t.className = "title";
+          t.textContent = `元素 #${i + 1}`;
+          const c = document.createElement("div");
+          c.className = "content";
+          c.textContent = "随机位置的可见元素，雪花会在其顶部堆积。";
+
+          el.appendChild(t);
+          el.appendChild(c);
+          elementsContainer.appendChild(el);
+
+          elements.push({ el, x, y, w, h });
+        }
+      }
+
+      // Resize handling
+      function resize() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const w = scene.clientWidth;
+        const h = scene.clientHeight;
+
+        // If layout not ready yet, retry shortly
+        if (!w || !h) {
+          setTimeout(resize, 50);
+          return;
+        }
+
+        snowCanvas.width = w * dpr;
+        snowCanvas.height = h * dpr;
+        snowCanvas.style.width = w + "px";
+        snowCanvas.style.height = h + "px";
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        accumCanvas.width = w * dpr;
+        accumCanvas.height = h * dpr;
+        accumCanvas.style.width = w + "px";
+        accumCanvas.style.height = h + "px";
+        aCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        // Rebuild collision map
+        buildCollisionMap();
+      }
+      window.addEventListener("resize", () => {
+        resize();
+      });
+
+      // Create collision map: an offscreen canvas that marks solid pixels (ground + elements)
+      let collCanvas, collCtx;
+      let collData, collW, collH;
+      function buildCollisionMap() {
+        const W = scene.clientWidth;
+        const H = scene.clientHeight;
+
+        collCanvas = document.createElement("canvas");
+        collCanvas.width = W;
+        collCanvas.height = H;
+        collCtx = collCanvas.getContext("2d");
+        collCtx.clearRect(0, 0, W, H);
+
+        // draw ground
+        const groundTop = H * (1 - 0.18);
+        collCtx.fillStyle = "#000";
+        collCtx.beginPath();
+        collCtx.rect(0, groundTop, W, H - groundTop);
+        collCtx.fill();
+
+        // draw elements as solid blocks
+        for (const e of elements) {
+          collCtx.fillStyle = "#000";
+          collCtx.fillRect(e.x, e.y, e.w, 10); // top collision strip
+          collCtx.fillRect(e.x, e.y + 10, 2, e.h - 10); // sides to help resting
+          collCtx.fillRect(e.x + e.w - 2, e.y + 10, 2, e.h - 10);
+        }
+
+        // Now collData is binary: black = solid
+        collW = W;
+        collH = H;
+        collData = collCtx.getImageData(0, 0, collW, collH);
+      }
+
+      function isSolid(x, y) {
+        // If collision data not ready yet, treat as non-solid
+        if (!collData || !collData.data || !collW || !collH) return false;
+        // Do NOT treat out-of-bounds as solid; let flakes move/wrap naturally
+        if (x < 0 || y < 0 || x >= collW || y >= collH) return false;
+        const idx = (Math.floor(y) * collW + Math.floor(x)) * 4;
+        return (
+          collData.data[idx] === 0 &&
+          collData.data[idx + 1] === 0 &&
+          collData.data[idx + 2] === 0 &&
+          collData.data[idx + 3] === 255
+        );
+      }
+
+      // Snow system
+      const flakes = [];
+      let targetDensity = parseInt(densityEl.value, 10);
+      let paused = false;
+
+      function spawnFlake() {
+        const W = scene.clientWidth;
+        const H = scene.clientHeight;
+        // Spawn at random X slightly above top
+        const x = rand(-20, W + 20);
+        const y = rand(-60, -10);
+        const r = rand(1.2, 3.2);
+        const density = rand(0.8, 1.35);
+
+        // Per-flake individualized parameters for more natural diversity
+        const mass = lerp(0.7, 1.6, (r - 1.2) / (3.2 - 1.2)); // larger flake -> heavier
+        const drag = rand(0.006, 0.012); // slightly stronger air resistance for stability
+        const swayAmp = rand(0.01, 0.04); // gentler horizontal sway amplitude
+        const swayFreq = rand(0.006, 0.02); // slower sway frequency
+        const gustFactor = rand(0.6, 1.4); // wind sensitivity
+        const wobblePhase = rand(0, Math.PI * 2); // phase offset
+        const wobbleDrift = rand(0.0002, 0.001); // slow phase drift to desync
+        const spin = rand(-0.002, 0.002); // tiny angular velocity
+        const angle = rand(0, Math.PI * 2); // orientation
+        const jitterAmp = rand(0.05, 0.25); // reduced pixel-level jitter amplitude
+        const jitterFreq = rand(0.004, 0.02); // slower jitter frequency
+        const terminalVy = lerp(0.08, 0.22, (r - 1.2) / (3.2 - 1.2)); // per-flake terminal fall speed
+
+        flakes.push({
+          x,
+          y,
+          r,
+          density,
+          vx: 0,
+          vy: 0,
+          life: 0,
+          settled: false,
+          // individualized dynamics
+          mass,
+          drag,
+          swayAmp,
+          swayFreq,
+          gustFactor,
+          wobblePhase,
+          wobbleDrift,
+          spin,
+          angle,
+          jitterAmp,
+          jitterFreq,
+          terminalVy,
+        });
+      }
+
+      function maintainFlakes() {
+        const diff = targetDensity - flakes.length;
+        if (diff > 0) {
+          const batch = Math.min(diff, 120);
+          for (let i = 0; i < batch; i++) spawnFlake();
+        } else if (diff < 0) {
+          flakes.splice(0, Math.min(flakes.length, Math.abs(diff)));
+        }
+      }
+
+      // Accumulation painter
+      function drawSnowDeposit(x, y, r) {
+        // soft white brush
+        const g = aCtx.createRadialGradient(x, y, 0, x, y, r * 2.2);
+        g.addColorStop(0, "rgba(255,255,255,0.95)");
+        g.addColorStop(0.4, "rgba(255,255,255,0.7)");
+        g.addColorStop(1, "rgba(255,255,255,0.0)");
+        aCtx.globalCompositeOperation = "lighter";
+        aCtx.fillStyle = g;
+        aCtx.beginPath();
+        aCtx.arc(x, y, r * 2.2, 0, Math.PI * 2);
+        aCtx.fill();
+        aCtx.globalCompositeOperation = "source-over";
+      }
+
+      // World parameters
+      let windSpeed = parseFloat(windEl.value);
+      let windDirDeg = parseFloat(dirEl.value);
+      let windVec = {
+        x: Math.sin((windDirDeg * Math.PI) / 180) * windSpeed,
+        y: Math.cos((windDirDeg * Math.PI) / 180) * 0.1,
+      };
+      const gravityBase = 0.06; // base gravity
+      let fallSpeed = parseFloat(fallEl?.value || "1.0"); // multiplier from UI
+      const airResist = 0.005;
+
+      // Update labels
+      function syncLabels() {
+        dVal.textContent = String(targetDensity);
+        wVal.textContent = parseFloat(windSpeed).toFixed(1);
+        dirVal.textContent = String(Math.round(windDirDeg));
+      }
+      syncLabels();
+      // Initialize fall speed label if control exists
+      if (fallVal) fallVal.textContent = fallSpeed.toFixed(2);
+
+      // UI events
+      densityEl.addEventListener("input", (e) => {
+        targetDensity = parseInt(e.target.value, 10);
+        dVal.textContent = String(targetDensity);
+      });
+      windEl.addEventListener("input", (e) => {
+        windSpeed = parseFloat(e.target.value);
+        wVal.textContent = windSpeed.toFixed(1);
+        windVec = {
+          x: Math.sin((windDirDeg * Math.PI) / 180) * windSpeed,
+          y: Math.cos((windDirDeg * Math.PI) / 180) * 0.1,
+        };
+      });
+      dirEl.addEventListener("input", (e) => {
+        windDirDeg = parseFloat(e.target.value);
+        dirVal.textContent = String(Math.round(windDirDeg));
+        windVec = {
+          x: Math.sin((windDirDeg * Math.PI) / 180) * windSpeed,
+          y: Math.cos((windDirDeg * Math.PI) / 180) * 0.1,
+        };
+      });
+
+      // New: fall speed control
+      if (fallEl) {
+        fallEl.addEventListener("input", (e) => {
+          fallSpeed = parseFloat(e.target.value);
+          if (fallVal) fallVal.textContent = fallSpeed.toFixed(2);
+        });
+      }
+      toggleBtn.addEventListener("click", () => {
+        paused = !paused;
+        if (!paused) lastT = performance.now();
+      });
+      resetBtn.addEventListener("click", () => {
+        aCtx.clearRect(0, 0, accumCanvas.width, accumCanvas.height);
+        hint.classList.remove("show");
+      });
+
+      // Snow rendering
+      let lastT = performance.now();
+      function step(now) {
+        const dt = Math.min(33, now - lastT);
+        lastT = now;
+
+        // If collision data not ready, wait a frame
+        if (!collData) {
+          requestAnimationFrame(step);
+          return;
+        }
+
+        if (!paused) {
+          maintainFlakes();
+          update(dt);
+          render();
+        }
+        requestAnimationFrame(step);
+      }
+
+      function update(dt) {
+        const W = scene.clientWidth;
+        const H = scene.clientHeight;
+
+        for (let i = flakes.length - 1; i >= 0; i--) {
+          const f = flakes[i];
+          if (f.settled) continue;
+
+          // Horizontal wind influence with damping (more stable)
+          const drag = f.drag ?? airResist;
+          f.vx +=
+            windVec.x * 0.012 * dt * (f.gustFactor ?? 1) - f.vx * drag * dt;
+
+          // Slow phase drift to desync group sway
+          f.wobblePhase = (f.wobblePhase ?? 0) + (f.wobbleDrift ?? 0.0005) * dt;
+
+          // Gentle horizontal sway (small contribution to velocity)
+          const swayAmp = f.swayAmp ?? 0.02;
+          const swayFreq = f.swayFreq ?? 0.012;
+          const wobblePhase = f.wobblePhase ?? 0;
+          const sway = Math.sin(wobblePhase + f.life * swayFreq) * swayAmp;
+          f.vx += sway * 0.2;
+
+          // Gravity scaled by UI fall speed and per-flake mass
+          const mass = f.mass ?? 1;
+          f.vy +=
+            gravityBase * fallSpeed * mass * dt +
+            windVec.y * 0.004 * dt -
+            f.vy * drag * dt;
+
+          // Ease horizontal velocity toward wind drift target to reduce reversals
+          const vxTarget = windVec.x * 0.6 * (f.gustFactor ?? 1);
+          f.vx = lerp(f.vx, vxTarget, 0.0006 * dt);
+
+          // Terminal vertical velocity cap per flake
+          const termVy = f.terminalVy ?? 0.16;
+          f.vy = Math.min(f.vy, termVy * (0.8 + 0.4 * fallSpeed));
+
+          // Tiny positional jitter (do not inject into velocity)
+          const jitterPos =
+            Math.sin(
+              f.life * (f.jitterFreq ?? 0.01) + (wobblePhase ?? 0) * 1.7
+            ) *
+            (f.jitterAmp ?? 0.12) *
+            0.15;
+
+          // Integrate
+          f.x += f.vx + jitterPos;
+          f.y += f.vy;
+          f.life += dt;
+
+          // Optional tiny rotation
+          if (typeof f.angle === "number" && typeof f.spin === "number") {
+            f.angle += f.spin * dt;
+          }
+
+          // Collision detection at next position
+          const px = f.x;
+          const py = f.y;
+          const hit = isSolid(px, py + f.r) || isSolid(px, py + f.r + 1);
+
+          // World bounds
+          if (py > H - 2) {
+            // ground
+            settleFlake(i, f, px, H - 2);
+            continue;
+          }
+
+          if (hit) {
+            // Try slide a bit with wind along surface if possible
+            let placed = false;
+            for (let sx of [
+              Math.sign(windVec.x) || 1,
+              -Math.sign(windVec.x) || -1,
+              1,
+              -1,
+              2,
+              -2,
+            ]) {
+              const nx = px + sx;
+              if (!isSolid(nx, py + f.r) && isSolid(nx, py + f.r + 1)) {
+                f.x = nx;
+                placed = true;
+                break;
+              }
+            }
+            if (!placed) {
+              settleFlake(i, f, px, py);
+            }
+          } else {
+            // If out of horizontal bounds, wrap
+            if (px < -30) f.x = W + 20;
+            if (px > W + 30) f.x = -20;
+            // If too long lived and off-screen, recycle
+            if (py < -100 || f.life > 60000) {
+              flakes.splice(i, 1);
+            }
+          }
+        }
+      }
+
+      function settleFlake(idx, f, x, y) {
+        flakes.splice(idx, 1);
+        drawSnowDeposit(x, y, f.r * rand(0.9, 1.4));
+        // Show hint occasionally
+        if (Math.random() < 0.02) {
+          hint.classList.add("show");
+          setTimeout(() => hint.classList.remove("show"), 2000);
+        }
+      }
+
+      function render() {
+        const W = scene.clientWidth;
+        const H = scene.clientHeight;
+        ctx.clearRect(0, 0, W, H);
+
+        // Slight parallax on stars
+        const t = performance.now() * 0.00003;
+        document.querySelector(".stars").style.transform = `translate(${
+          Math.sin(t * 1.2) * 10
+        }px, ${Math.cos(t * 1.3) * 6}px)`;
+        document.querySelector(".stars2").style.transform = `translate(${
+          Math.sin(t * 1.6) * 16
+        }px, ${Math.cos(t * 1.1) * 8}px)`;
+        document.querySelector(".stars3").style.transform = `translate(${
+          Math.sin(t * 2.0) * 24
+        }px, ${Math.cos(t * 0.9) * 12}px)`;
+
+        // Draw flakes
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        for (const f of flakes) {
+          const r = f.r;
+
+          ctx.save();
+          // Slight orientation variance
+          if (typeof f.angle === "number") {
+            ctx.translate(f.x, f.y);
+            ctx.rotate((f.angle || 0) * 0.2);
+          } else {
+            ctx.translate(f.x, f.y);
+          }
+
+          const gx = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 2);
+          gx.addColorStop(0.0, "rgba(255,255,255,0.95)");
+          gx.addColorStop(0.6, "rgba(220,235,255,0.65)");
+          gx.addColorStop(1.0, "rgba(255,255,255,0.0)");
+          ctx.fillStyle = gx;
+          ctx.beginPath();
+          ctx.arc(0, 0, r * 1.6, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Tiny sparkle
+          ctx.fillStyle = "rgba(255,255,255,0.6)";
+          ctx.fillRect(-0.3, -0.3, 0.6, 0.6);
+
+          ctx.restore();
+        }
+        ctx.restore();
+
+        // Soft fog near ground
+        const fog = ctx.createLinearGradient(0, H * 0.6, 0, H);
+        fog.addColorStop(0, "rgba(200,220,255,0)");
+        fog.addColorStop(1, "rgba(200,220,255,0.10)");
+        ctx.fillStyle = fog;
+        ctx.fillRect(0, H * 0.6, W, H * 0.4);
+      }
+
+      // Initialize
+      function init() {
+        applyStars();
+        createRandomElements();
+        resize();
+        // Extra resize after layout settles
+        setTimeout(resize, 50);
+
+        // Seed more flakes for immediate visibility
+        const initial = Math.min(targetDensity, 600);
+        for (let i = 0; i < initial; i++) spawnFlake();
+
+        // Slight delay then show hint
+        setTimeout(() => hint.classList.add("show"), 800);
+        setTimeout(() => hint.classList.remove("show"), 2800);
+
+        lastT = performance.now();
+        requestAnimationFrame(step);
+      }
+
+      // Ensure DOM is ready before init
+      if (document.readyState === "loading") {
+        window.addEventListener("DOMContentLoaded", init, { once: true });
+      } else {
+        init();
+      }
+    </script>
+  </body>
+</html>

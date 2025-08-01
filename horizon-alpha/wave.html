@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <title>Wave — 高级渐变磨砂浮动波浪</title>
+    <meta name="color-scheme" content="dark light" />
+    <style>
+      :root {
+        --glass-bg: rgba(255, 255, 255, 0.14);
+        --glass-border: rgba(255, 255, 255, 0.25);
+        --text: #0b1020;
+        --text-weak: #223;
+        --accent: #7aa6ff;
+        --shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --glass-bg: rgba(13, 18, 34, 0.38);
+          --glass-border: rgba(216, 224, 255, 0.16);
+          --text: #e9eefc;
+          --text-weak: #b9c2e0;
+          --accent: #98b3ff;
+          --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+        }
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        background: radial-gradient(
+            1200px 800px at 20% 10%,
+            #e6f0ff 0%,
+            #f6f7ff 35%,
+            #f1f3ff 55%,
+            #eef0ff 70%,
+            #eaf0ff 100%
+          )
+          fixed;
+        color: var(--text);
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
+          Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+        overflow: hidden;
+      }
+      /* Ambient gradient backdrop for depth */
+      .backdrop {
+        position: fixed;
+        inset: -20vmax;
+        background: radial-gradient(
+            60vmax 50vmax at 10% 15%,
+            rgba(129, 186, 255, 0.3),
+            transparent 60%
+          ),
+          radial-gradient(
+            70vmax 60vmax at 85% 25%,
+            rgba(177, 129, 255, 0.25),
+            transparent 60%
+          ),
+          radial-gradient(
+            65vmax 50vmax at 50% 85%,
+            rgba(114, 241, 198, 0.2),
+            transparent 60%
+          );
+        filter: blur(40px) saturate(110%);
+        z-index: 0;
+        pointer-events: none;
+      }
+
+      canvas {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+        z-index: 1;
+      }
+
+      /* Frosted glass HUD */
+      .panel {
+        position: fixed;
+        right: clamp(12px, 3vw, 28px);
+        top: clamp(12px, 3vw, 28px);
+        z-index: 3;
+        backdrop-filter: blur(14px) saturate(110%);
+        -webkit-backdrop-filter: blur(14px) saturate(110%);
+        background: var(--glass-bg);
+        border: 1px solid var(--glass-border);
+        border-radius: 16px;
+        box-shadow: var(--shadow);
+        padding: 14px 14px 8px;
+        min-width: min(86vw, 320px);
+      }
+      .panel h1 {
+        margin: 0 0 8px;
+        font-size: 16px;
+        letter-spacing: 0.3px;
+        font-weight: 600;
+        color: var(--text);
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 120px 1fr auto;
+        gap: 10px;
+        align-items: center;
+        margin: 10px 0;
+      }
+      .row label {
+        font-size: 12px;
+        color: var(--text-weak);
+        white-space: nowrap;
+      }
+      .row input[type="range"] {
+        width: 100%;
+        -webkit-appearance: none;
+        appearance: none;
+        height: 4px;
+        border-radius: 999px;
+        background: linear-gradient(
+          90deg,
+          rgba(122, 166, 255, 0.9),
+          rgba(177, 129, 255, 0.9)
+        );
+        outline: none;
+      }
+      .row input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: white;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+        cursor: pointer;
+      }
+      .row input[type="range"]::-moz-range-thumb {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: white;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+        cursor: pointer;
+      }
+      .val {
+        min-width: 42px;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        color: var(--text);
+        font-size: 12px;
+      }
+
+      /* Signature badge */
+      .badge {
+        position: fixed;
+        left: clamp(12px, 3vw, 28px);
+        bottom: clamp(12px, 3vw, 28px);
+        z-index: 3;
+        backdrop-filter: blur(10px) saturate(110%);
+        -webkit-backdrop-filter: blur(10px) saturate(110%);
+        background: var(--glass-bg);
+        border: 1px solid var(--glass-border);
+        border-radius: 999px;
+        box-shadow: var(--shadow);
+        padding: 8px 12px;
+        font-size: 12px;
+        color: var(--text-weak);
+      }
+
+      /* Subtle grain for matte/frosted texture */
+      .grain {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 2;
+        opacity: 0.12;
+        background-image: url("https://cdn.jsdelivr.net/gh/edelvarden/noise-texture@main/noise-1024x1024.png");
+        background-size: 300px 300px;
+        mix-blend-mode: soft-light;
+        animation: grainShift 6s steps(6) infinite;
+      }
+      @keyframes grainShift {
+        0% {
+          transform: translate3d(0, 0, 0);
+        }
+        100% {
+          transform: translate3d(-30px, 20px, 0);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="backdrop" aria-hidden="true"></div>
+    <canvas
+      id="waves"
+      aria-label="Animated gradient floating waves"
+      role="img"
+    ></canvas>
+
+    <section class="panel" aria-label="控制面板">
+      <h1>波浪背景 · 控制</h1>
+      <p>由horizon-alpha制作</p>
+      <div class="row">
+        <label for="intensity">波浪强度 (幅度)</label>
+        <input
+          id="intensity"
+          type="range"
+          min="0"
+          max="100"
+          step="1"
+          value="42"
+        />
+        <div class="val" id="intensityVal">0.42</div>
+      </div>
+      <div class="row">
+        <label for="count">波浪数量 (层)</label>
+        <input id="count" type="range" min="1" max="12" step="1" value="6" />
+        <div class="val" id="countVal">6</div>
+      </div>
+      <div class="row">
+        <label for="cycles">次数/速度 (频率)</label>
+        <input id="cycles" type="range" min="0" max="100" step="1" value="50" />
+        <div class="val" id="cyclesVal">1.00x</div>
+      </div>
+      <div class="row">
+        <label for="peaks">最大波峰数</label>
+        <input id="peaks" type="range" min="1" max="3" step="1" value="2" />
+        <div class="val" id="peaksVal">2</div>
+      </div>
+    </section>
+
+    <div class="badge">Gradient · Frosted · Floating Waves</div>
+    <div class="grain" aria-hidden="true"></div>
+
+    <!-- tiny-noise for organic float (CDN) -->
+    <script
+      src="https://cdn.jsdelivr.net/npm/simplex-noise@4.0.1/dist/esm/simplex-noise.min.js"
+      type="module"
+    ></script>
+    <script type="module">
+      // Using ESM to import SimplexNoise cleanly
+      import { createNoise2D } from "https://cdn.jsdelivr.net/npm/simplex-noise@4.0.1/dist/esm/simplex-noise.js";
+
+      const canvas = document.getElementById("waves");
+      const ctx = canvas.getContext("2d", { alpha: true });
+
+      // Device pixel ratio-aware sizing
+      let dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+      function resize() {
+        dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+        const { innerWidth: w, innerHeight: h } = window;
+        canvas.width = Math.floor(w * dpr);
+        canvas.height = Math.floor(h * dpr);
+        canvas.style.width = w + "px";
+        canvas.style.height = h + "px";
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+      resize();
+      window.addEventListener("resize", resize, { passive: true });
+
+      // Controls
+      const intensityEl = document.getElementById("intensity");
+      const countEl = document.getElementById("count");
+      const cyclesEl = document.getElementById("cycles");
+      const intensityVal = document.getElementById("intensityVal");
+      const countVal = document.getElementById("countVal");
+      const cyclesVal = document.getElementById("cyclesVal");
+      const peaksEl = document.getElementById("peaks");
+      const peaksVal = document.getElementById("peaksVal");
+
+      function getParams() {
+        const amp = Number(intensityEl.value) / 100; // 0..1
+        const layers = Number(countEl.value) | 0; // 1..12
+        const speed = Number(cyclesEl.value) / 50; // ~0..2
+        const peaks = Math.max(1, Math.min(3, Number(peaksEl?.value || 2))) | 0; // 1..3
+        return { amp, layers, speed, peaks };
+      }
+      function updateLabels() {
+        const { amp, layers, speed, peaks } = getParams();
+        intensityVal.textContent = amp.toFixed(2);
+        countVal.textContent = String(layers);
+        cyclesVal.textContent = speed.toFixed(2) + "x";
+        if (peaksVal) peaksVal.textContent = String(peaks);
+      }
+      intensityEl.addEventListener("input", updateLabels);
+      countEl.addEventListener("input", updateLabels);
+      cyclesEl.addEventListener("input", updateLabels);
+      peaksEl.addEventListener("input", updateLabels);
+      updateLabels();
+
+      // Color palette (soft gradient set)
+      const palettes = [
+        // cool luxury
+        ["#9fb9ff", "#c2a9ff", "#9be7d8", "#cde0ff"],
+        // dawn
+        ["#ffd6e8", "#ffe6b3", "#c7e7ff", "#e2d7ff"],
+        // ocean mint
+        ["#a7f3d0", "#93c5fd", "#c4b5fd", "#bae6fd"],
+      ];
+      let paletteIndex = 0;
+
+      function lerp(a, b, t) {
+        return a + (b - a) * t;
+      }
+      function hslaToRgba(h, s, l, a) {
+        // convert HSL to RGB
+        s /= 100;
+        l /= 100;
+        const k = (n) => (n + h / 30) % 12;
+        const f = (n) =>
+          l -
+          s *
+            Math.min(l, 1 - l) *
+            Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+        const r = Math.round(255 * f(0)),
+          g = Math.round(255 * f(8)),
+          b = Math.round(255 * f(4));
+        return `rgba(${r},${g},${b},${a})`;
+      }
+
+      // Gradient generator per layer
+      function makeLayerGradient(y, height, colors) {
+        const { innerWidth: w, innerHeight: h } = window;
+        // 每个波浪独立的线性渐变，方向结合层深和时间微扰，增强流动感
+        const angleShift = (y / Math.max(1, h)) * Math.PI * 0.15;
+        const grd = ctx.createLinearGradient(
+          0,
+          y - h * (0.15 + 0.05 * Math.sin(angleShift)),
+          w,
+          y + h * (0.15 + 0.05 * Math.cos(angleShift))
+        );
+        const n = colors.length;
+        for (let i = 0; i < n; i++) {
+          const t = i / (n - 1);
+          grd.addColorStop(
+            t,
+            hexToRgba(colors[i], 0.7 - 0.2 * Math.abs(0.5 - t))
+          );
+        }
+        return grd;
+      }
+
+      function hexToRgba(hex, a = 1) {
+        const s = hex.replace("#", "");
+        const bigint = parseInt(
+          s.length === 3
+            ? s
+                .split("")
+                .map((ch) => ch + ch)
+                .join("")
+            : s,
+          16
+        );
+        const r = (bigint & 0xff0000) >> 16;
+        const g = (bigint & 0x00ff00) >> 8;
+        const b = bigint & 0x0000ff;
+        return `rgba(${r},${g},${b},${a})`;
+      }
+
+      // Simplex noise for organic float
+      const noise2D = createNoise2D();
+
+      // Layer seeds
+      function makeSeeds(n) {
+        const arr = [];
+        for (let i = 0; i < n; i++) {
+          arr.push({
+            phase: Math.random() * Math.PI * 2,
+            freq: 0.6 + Math.random() * 0.6,
+            drift: (Math.random() * 2 - 1) * 0.6,
+            noiseAmp: 16 + Math.random() * 28,
+            noiseScale: 0.0009 + Math.random() * 0.0018,
+          });
+        }
+        return arr;
+      }
+      let seeds = makeSeeds(12);
+
+      // Offscreen canvas for soft blur overlay to produce frosted/matte depth
+      let off = document.createElement("canvas");
+      let offCtx = off.getContext("2d");
+      function resizeOff() {
+        off.width = Math.floor(window.innerWidth * dpr);
+        off.height = Math.floor(window.innerHeight * dpr);
+        offCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+      resizeOff();
+      window.addEventListener("resize", resizeOff);
+
+      // Draw a single wave layer path and fill
+      function drawLayer(t, layerIndex, totalLayers, params) {
+        const { innerWidth: w, innerHeight: h } = window;
+        const midY = h * 0.5;
+
+        // depth factor: back to front
+        const depth = layerIndex / Math.max(1, totalLayers - 1);
+        const easedDepth = depth * depth * (3 - 2 * depth); // smoothstep
+
+        const s = seeds[layerIndex] || seeds[seeds.length - 1];
+
+        // Layer parameters
+        const baseAmp = lerp(18, 120, params.amp); // amplitude range scaled by intensity
+        const amp = baseAmp * (0.7 + 0.6 * (1 - easedDepth)); // closer layers larger amp
+        // 通过最大波峰数限制基础频率，使每屏横向波峰保持在 1~peaks 之间
+        const desiredPeaks = Math.max(1, Math.min(3, params.peaks | 0));
+        const baseFreq = desiredPeaks / w; // 每屏最大波峰数对应的基频
+        const freq =
+          baseFreq *
+          (0.6 + 0.4 * s.freq) *
+          (0.6 + 0.6 * (params.speed * 0.5 + 0.5));
+        const speed = 0.25 + params.speed * 0.25; // 减缓水平相位速度，更平缓
+        const verticalFloat =
+          Math.sin(t * 0.35 + s.phase) * 14 * (0.5 + (1 - easedDepth)); // 更柔和的浮动
+
+        // Path
+        ctx.beginPath();
+        const k = 2; // horizontal subdivision factor
+        const step = Math.max(1, Math.floor(w / 140)); // sampling density
+        for (let x = -10; x <= w + 10; x += step) {
+          const nx = x / w;
+          const phase = t * speed + nx * Math.PI * 2;
+          // 减少高频成分，主导为正弦
+          const ySin = Math.sin(phase * freq * w) * amp;
+
+          // add slight cosine to avoid simple horizontal-only look
+          const yCos = Math.cos(phase * freq * 0.5 * w) * amp * 0.18; // 更小的余弦混合
+
+          // simplex noise modulation along x and time for organic movement
+          const n = noise2D(
+            nx * (s.noiseScale * w) * 0.6,
+            t * 0.12 + layerIndex * 0.08
+          );
+          const yNoise = n * s.noiseAmp * 0.7 * (0.6 + 0.6 * (1 - easedDepth)); // 降低噪声幅度
+
+          const y =
+            midY +
+            verticalFloat +
+            (easedDepth - 0.5) * h * 0.45 +
+            ySin +
+            yCos +
+            yNoise;
+
+          if (x === -10) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.lineTo(w + 20, h + 20);
+        ctx.lineTo(-20, h + 20);
+        ctx.closePath();
+
+        // Fill with gradient per-wave (每个波浪独立渐变)
+        const colors = palettes[paletteIndex % palettes.length];
+        const gradY =
+          midY + (easedDepth - 0.5) * h * 0.45 + verticalFloat * 0.15;
+        ctx.fillStyle = makeLayerGradient(gradY, h, colors);
+        ctx.globalAlpha = 0.78 - easedDepth * 0.38;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+
+        // subtle inner highlight (specular-like)
+        ctx.save();
+        ctx.clip();
+        const gloss = ctx.createLinearGradient(
+          0,
+          midY - h * 0.6,
+          0,
+          midY + h * 0.6
+        );
+        gloss.addColorStop(0.45, "rgba(255,255,255,0)");
+        gloss.addColorStop(0.5, "rgba(255,255,255,0.08)");
+        gloss.addColorStop(0.55, "rgba(255,255,255,0)");
+        ctx.fillStyle = gloss;
+        ctx.fillRect(0, 0, w, h);
+        ctx.restore();
+      }
+
+      let lastT = 0;
+      function render(ts) {
+        const t = ts / 1000;
+        const dt = Math.min(0.032, t - lastT || 0.016);
+        lastT = t;
+
+        const { innerWidth: w, innerHeight: h } = window;
+
+        // Clear base
+        ctx.clearRect(0, 0, w, h);
+
+        const params = getParams();
+        // Rebuild seeds if layer count changed towards greater number
+        if (params.layers > seeds.length) {
+          seeds = seeds.concat(makeSeeds(params.layers - seeds.length));
+        }
+
+        // draw back to front for proper layering
+        for (let i = 0; i < params.layers; i++) {
+          drawLayer(t, i, params.layers, params);
+        }
+
+        // offscreen soft blur glow pass for premium feel
+        offCtx.clearRect(0, 0, off.width, off.height);
+        offCtx.drawImage(canvas, 0, 0, off.width / dpr, off.height / dpr);
+        offCtx.globalCompositeOperation = "overlay";
+        offCtx.filter = "blur(24px) saturate(120%)";
+        offCtx.fillStyle = "rgba(255,255,255,0.05)";
+        offCtx.fillRect(0, 0, off.width / dpr, off.height / dpr);
+        offCtx.globalCompositeOperation = "source-over";
+        offCtx.filter = "none";
+
+        // blend overlay back
+        ctx.globalAlpha = 0.35;
+        ctx.drawImage(off, 0, 0, off.width / dpr, off.height / dpr, 0, 0, w, h);
+        ctx.globalAlpha = 1;
+
+        requestAnimationFrame(render);
+      }
+      requestAnimationFrame(render);
+
+      // Optional: switch palette on click of badge for fun
+      document.querySelector(".badge").addEventListener("click", () => {
+        paletteIndex = (paletteIndex + 1) % palettes.length;
+        document.querySelector(".badge").textContent =
+          paletteIndex === 0
+            ? "Gradient · Frosted · Floating Waves"
+            : paletteIndex === 1
+            ? "Dawn · Velvet · Floating Waves"
+            : "Ocean · Mint · Floating Waves";
+      });
+    </script>
+  </body>
+</html>

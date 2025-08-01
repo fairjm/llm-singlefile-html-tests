@@ -1,0 +1,1519 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>迷宫生成与寻路可视化</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        --bg: #0f1220;
+        --panel: #171a2e;
+        --text: #e7ecff;
+        --accent: #6bd5ff;
+        --accent2: #ff8a65;
+        --grid: #2a2f52;
+        --wall: #394173;
+        --path: #ffe66e;
+        --visited: #4ecdc4;
+        --frontier: #ff6b6b;
+        --start: #7bed9f;
+        --end: #ff4757;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
+          "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans";
+        color: var(--text);
+        background: radial-gradient(
+          1200px 800px at 10% -10%,
+          #1b1f3b 0%,
+          #0f1220 60%
+        );
+        background-attachment: fixed;
+      }
+      header {
+        padding: 16px 20px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.02),
+          rgba(0, 0, 0, 0)
+        );
+        backdrop-filter: blur(6px);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+      }
+      header h1 {
+        margin: 0;
+        font-size: 18px;
+        letter-spacing: 0.4px;
+        font-weight: 600;
+      }
+      header .badge {
+        font-size: 12px;
+        color: #9bb0ff;
+        border: 1px solid rgba(155, 176, 255, 0.35);
+        border-radius: 999px;
+        padding: 2px 8px;
+      }
+      .container {
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        gap: 16px;
+        padding: 16px;
+        height: calc(100% - 64px);
+      }
+      @media (max-width: 980px) {
+        .container {
+          grid-template-columns: 1fr;
+          grid-auto-rows: min-content auto;
+          height: auto;
+        }
+      }
+      .panel {
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.04),
+          rgba(255, 255, 255, 0.02)
+        );
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        padding: 16px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+      }
+      .controls {
+        display: grid;
+        gap: 12px;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      label {
+        font-size: 12px;
+        opacity: 0.85;
+        display: block;
+        margin-bottom: 6px;
+      }
+      input[type="number"],
+      select,
+      button,
+      input[type="range"] {
+        width: 100%;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: var(--text);
+        border-radius: 10px;
+        padding: 10px 12px;
+        outline: none;
+        transition: 0.2s ease;
+      }
+      input[type="number"]:focus,
+      select:focus,
+      input[type="range"]:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(107, 213, 255, 0.2);
+      }
+      input[type="range"] {
+        padding: 8px 0;
+        appearance: none;
+        height: 34px;
+        background: transparent;
+      }
+      input[type="range"]::-webkit-slider-runnable-track {
+        height: 6px;
+        background: linear-gradient(90deg, var(--accent) 0%, #7aa7ff 100%);
+        border-radius: 999px;
+        opacity: 0.6;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        appearance: none;
+        width: 18px;
+        height: 18px;
+        background: #fff;
+        border: 2px solid var(--accent);
+        border-radius: 50%;
+        margin-top: -6px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.08),
+          rgba(255, 255, 255, 0.02)
+        );
+        color: var(--text);
+        cursor: pointer;
+        user-select: none;
+        transition: transform 0.05s ease, filter 0.2s ease, background 0.2s ease;
+      }
+      .btn:hover {
+        filter: brightness(1.05);
+      }
+      .btn:active {
+        transform: translateY(1px) scale(0.99);
+      }
+      .btn.primary {
+        background: linear-gradient(
+          180deg,
+          rgba(107, 213, 255, 0.25),
+          rgba(107, 213, 255, 0.12)
+        );
+        border-color: rgba(107, 213, 255, 0.45);
+      }
+      .btn.warn {
+        background: linear-gradient(
+          180deg,
+          rgba(255, 138, 101, 0.25),
+          rgba(255, 138, 101, 0.12)
+        );
+        border-color: rgba(255, 138, 101, 0.45);
+      }
+      .inline {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .legend {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 8px;
+        margin-top: 10px;
+        font-size: 12px;
+        opacity: 0.9;
+      }
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .swatch {
+        width: 16px;
+        height: 16px;
+        border-radius: 4px;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+      }
+      .sw-wall {
+        background: var(--wall);
+      }
+      .sw-path {
+        background: var(--path);
+      }
+      .sw-visited {
+        background: var(--visited);
+      }
+      .sw-frontier {
+        background: var(--frontier);
+      }
+      .sw-start {
+        background: var(--start);
+      }
+      .sw-end {
+        background: var(--end);
+      }
+
+      .board {
+        position: relative;
+        display: grid;
+        grid-template-rows: auto 1fr;
+        gap: 10px;
+        min-height: 400px;
+      }
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .status {
+        font-size: 13px;
+        opacity: 0.85;
+      }
+      canvas {
+        width: 100%;
+        height: calc(100vh - 220px);
+        min-height: 420px;
+        background: linear-gradient(
+            180deg,
+            rgba(255, 255, 255, 0.03),
+            rgba(255, 255, 255, 0.01)
+          ),
+          radial-gradient(
+            600px 400px at 80% -10%,
+            rgba(123, 174, 255, 0.08),
+            rgba(0, 0, 0, 0)
+          );
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+          0 18px 40px rgba(0, 0, 0, 0.25);
+        image-rendering: pixelated;
+      }
+      footer {
+        padding: 10px 16px 20px;
+        text-align: center;
+        font-size: 12px;
+        opacity: 0.6;
+      }
+      .small {
+        font-size: 12px;
+        opacity: 0.85;
+      }
+      .gridToggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "seedrandom": "https://cdn.jsdelivr.net/npm/seedrandom@3.0.5/+esm",
+          "tinyqueue": "https://cdn.jsdelivr.net/npm/tinyqueue@2.0.3/index.min.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <header>
+      <h1>迷宫生成与寻路可视化</h1>
+      <span class="badge">单文件 · 可配置 · 动画</span>
+      <p>由horizon-alpha制作</p>
+    </header>
+
+    <div class="container">
+      <section class="panel">
+        <div class="controls">
+          <div class="row">
+            <div>
+              <label for="rows">行数 Rows</label>
+              <input
+                id="rows"
+                type="number"
+                min="5"
+                max="201"
+                step="2"
+                value="41"
+              />
+            </div>
+            <div>
+              <label for="cols">列数 Cols</label>
+              <input
+                id="cols"
+                type="number"
+                min="5"
+                max="201"
+                step="2"
+                value="41"
+              />
+            </div>
+          </div>
+
+          <div class="row">
+            <div>
+              <label for="genAlgo">生成算法</label>
+              <select id="genAlgo">
+                <option value="dfs">递归回溯(DFS)</option>
+                <option value="prim">随机Prim</option>
+                <option value="kruskal">随机Kruskal</option>
+                <option value="eller">Eller(行扫描)</option>
+              </select>
+            </div>
+            <div>
+              <label for="seed">随机种子 (留空为随机)</label>
+              <input id="seed" type="text" placeholder="如 42 或 hello" />
+            </div>
+          </div>
+
+          <div class="row">
+            <div>
+              <label for="algo">寻路算法</label>
+              <select id="algo">
+                <option value="bfs">BFS</option>
+                <option value="dfs">DFS</option>
+                <option value="dijkstra">Dijkstra</option>
+                <option value="astar">A*</option>
+                <option value="greedy">贪心最佳优先</option>
+                <option value="bidirectional">双向BFS</option>
+              </select>
+            </div>
+            <div>
+              <label for="heuristic">A*/贪心 启发函数</label>
+              <select id="heuristic">
+                <option value="manhattan">曼哈顿</option>
+                <option value="euclid">欧几里得</option>
+                <option value="chebyshev">切比雪夫</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="row">
+            <div>
+              <label for="speed"
+                >动画速度: <span id="speedLabel">1x</span></label
+              >
+              <input
+                id="speed"
+                type="range"
+                min="0.1"
+                max="5"
+                value="1"
+                step="0.1"
+              />
+            </div>
+            <div>
+              <label for="cellSize">单元像素大小</label>
+              <input
+                id="cellSize"
+                type="range"
+                min="4"
+                max="24"
+                value="12"
+                step="1"
+              />
+            </div>
+          </div>
+
+          <div class="inline">
+            <button class="btn primary" id="btnGenerate">生成迷宫</button>
+            <button class="btn" id="btnSolve">开始寻路</button>
+            <button class="btn warn" id="btnStop">停止</button>
+            <button class="btn" id="btnClear">清除路径</button>
+          </div>
+
+          <div class="inline">
+            <label class="gridToggle">
+              <input type="checkbox" id="showGrid" checked />
+              显示网格
+            </label>
+            <label class="gridToggle">
+              <input type="checkbox" id="autoSolve" />
+              生成后自动寻路
+            </label>
+          </div>
+
+          <div class="inline">
+            <label class="gridToggle">
+              <input type="checkbox" id="stepMode" />
+              寻路单步模式
+            </label>
+            <button class="btn" id="btnStep" disabled>单步执行(空格)</button>
+          </div>
+
+          <div class="legend">
+            <div class="legend-item">
+              <span class="swatch sw-wall"></span>墙 Wall
+            </div>
+            <div class="legend-item">
+              <span class="swatch sw-visited"></span>已访问
+            </div>
+            <div class="legend-item">
+              <span class="swatch sw-frontier"></span>边界/开放集
+            </div>
+            <div class="legend-item">
+              <span class="swatch sw-path"></span>最终路径
+            </div>
+            <div class="legend-item">
+              <span class="swatch sw-start"></span>起点
+            </div>
+            <div class="legend-item">
+              <span class="swatch sw-end"></span>终点
+            </div>
+          </div>
+
+          <div class="small">
+            提示: 1) 行列建议为奇数，边界为墙； 2) 生成算法影响通路风格； 3) A*
+            使用启发函数加速； 4) 支持暂停/继续/重新开始； 5)
+            勾选“寻路单步模式”后，点击“单步执行”或按空格逐步推进。
+          </div>
+        </div>
+      </section>
+
+      <section class="panel board">
+        <div class="topbar">
+          <div class="status" id="status">准备就绪</div>
+          <div class="inline">
+            <button class="btn" id="btnRandomizeStartEnd">随机起终点</button>
+            <button class="btn" id="btnExport">导出迷宫JSON</button>
+            <button class="btn" id="btnImport">导入迷宫JSON</button>
+          </div>
+        </div>
+        <canvas id="canvas"></canvas>
+      </section>
+    </div>
+
+    <footer>© 2024 迷宫生成与寻路 - 单文件演示</footer>
+
+    <script type="module">
+      import seedrandom from "seedrandom";
+      import TinyQueue from "tinyqueue";
+
+      // Utility random with optional seed
+      class RNG {
+        constructor(seed) {
+          this.rng = seed ? seedrandom(seed) : Math.random;
+        }
+        next() {
+          return this.rng();
+        }
+        int(n) {
+          return Math.floor(this.next() * n);
+        }
+        pick(arr) {
+          return arr[this.int(arr.length)];
+        }
+        shuffle(arr) {
+          for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(this.next() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+          }
+          return arr;
+        }
+      }
+
+      // Maze data structure: grid of 0=wall, 1=passage
+      class Maze {
+        constructor(rows, cols) {
+          this.rows = rows;
+          this.cols = cols;
+          this.grid = Array.from({ length: rows }, () =>
+            new Uint8Array(cols).fill(0)
+          );
+          this.start = { r: 1, c: 1 };
+          this.end = { r: rows - 2, c: cols - 2 };
+        }
+        inBounds(r, c) {
+          return r >= 0 && c >= 0 && r < this.rows && c < this.cols;
+        }
+        isWall(r, c) {
+          return this.grid[r][c] === 0;
+        }
+        setPassage(r, c) {
+          this.grid[r][c] = 1;
+        }
+        setWall(r, c) {
+          this.grid[r][c] = 0;
+        }
+        resetPassages() {
+          for (let r = 0; r < this.rows; r++) this.grid[r].fill(0);
+        }
+        passages() {
+          // useful for Kruskal
+          const ps = [];
+          for (let r = 1; r < this.rows; r += 2)
+            for (let c = 1; c < this.cols; c += 2) ps.push([r, c]);
+          return ps;
+        }
+      }
+
+      // Generator algorithms
+      function generateDFS(maze, rng, onStep) {
+        const { rows, cols } = maze;
+        maze.resetPassages();
+        const dirs = [
+          [-2, 0],
+          [2, 0],
+          [0, -2],
+          [0, 2],
+        ];
+        const stack = [];
+        const start = [1, 1];
+        maze.setPassage(1, 1);
+        stack.push(start);
+        function step() {
+          if (!stack.length) return true;
+          const [r, c] = stack[stack.length - 1];
+          const neighbors = [];
+          for (const [dr, dc] of rng.shuffle(dirs.slice())) {
+            const nr = r + dr,
+              nc = c + dc;
+            if (
+              nr > 0 &&
+              nc > 0 &&
+              nr < rows - 1 &&
+              nc < cols - 1 &&
+              maze.isWall(nr, nc)
+            ) {
+              neighbors.push([nr, nc, r + dr / 2, c + dc / 2]);
+            }
+          }
+          if (neighbors.length === 0) {
+            stack.pop();
+          } else {
+            const [nr, nc, wr, wc] = rng.pick(neighbors);
+            maze.setPassage(wr, wc);
+            maze.setPassage(nr, nc);
+            stack.push([nr, nc]);
+          }
+          onStep?.();
+          return false;
+        }
+        return step;
+      }
+
+      function generatePrim(maze, rng, onStep) {
+        const { rows, cols } = maze;
+        maze.resetPassages();
+        const inMaze = (r, c) => maze.grid[r][c] === 1;
+        const walls = [];
+        const addWalls = (r, c) => {
+          const dirs = [
+            [-2, 0],
+            [2, 0],
+            [0, -2],
+            [0, 2],
+          ];
+          for (const [dr, dc] of dirs) {
+            const nr = r + dr,
+              nc = c + dc,
+              wr = r + dr / 2,
+              wc = c + dc / 2;
+            if (
+              nr > 0 &&
+              nc > 0 &&
+              nr < rows - 1 &&
+              nc < cols - 1 &&
+              maze.isWall(nr, nc)
+            ) {
+              walls.push([wr, wc, r, c, nr, nc]);
+            }
+          }
+        };
+        const sr = 1 + 2 * rng.int((rows - 1) / 2);
+        const sc = 1 + 2 * rng.int((cols - 1) / 2);
+        maze.setPassage(sr, sc);
+        addWalls(sr, sc);
+        function step() {
+          if (!walls.length) return true;
+          const idx = rng.int(walls.length);
+          const [wr, wc, r, c, nr, nc] = walls.splice(idx, 1)[0];
+          if (inMaze(r, c) ^ inMaze(nr, nc)) {
+            maze.setPassage(wr, wc);
+            maze.setPassage(nr, nc);
+            addWalls(nr, nc);
+          }
+          onStep?.();
+          return walls.length === 0;
+        }
+        return step;
+      }
+
+      function generateKruskal(maze, rng, onStep) {
+        const { rows, cols } = maze;
+        maze.resetPassages();
+        // Initialize passages at odd cells
+        for (let r = 1; r < rows; r += 2)
+          for (let c = 1; c < cols; c += 2) maze.setPassage(r, c);
+        const id = new Map(); // key "r,c" -> set id
+        let setId = 0;
+        for (let r = 1; r < rows; r += 2)
+          for (let c = 1; c < cols; c += 2) id.set(r + "," + c, setId++);
+        const walls = [];
+        for (let r = 1; r < rows; r += 2)
+          for (let c = 1; c < cols; c += 2) {
+            if (r + 2 < rows) walls.push([r + 1, c, r, c, r + 2, c]);
+            if (c + 2 < cols) walls.push([r, c + 1, r, c, r, c + 2]);
+          }
+        rng.shuffle(walls);
+        function find(key) {
+          return id.get(key);
+        }
+        function union(aKey, bKey) {
+          const aid = find(aKey),
+            bid = find(bKey);
+          if (aid === bid) return false;
+          // merge all bid into aid
+          for (const [k, v] of id) if (v === bid) id.set(k, aid);
+          return true;
+        }
+        let idx = 0;
+        function step() {
+          if (idx >= walls.length) return true;
+          const [wr, wc, ar, ac, br, bc] = walls[idx++];
+          const aKey = ar + "," + ac,
+            bKey = br + "," + bc;
+          if (union(aKey, bKey)) {
+            maze.setPassage(wr, wc);
+          }
+          onStep?.();
+          return idx >= walls.length;
+        }
+        return step;
+      }
+
+      // Eller algorithm (row-by-row)
+      function generateEller(maze, rng, onStep) {
+        const { rows, cols } = maze;
+        maze.resetPassages();
+        const W = cols,
+          H = rows;
+        // Only consider odd columns as cells per row
+        const cellCols = Math.floor((W - 1) / 2);
+
+        let nextSetId = 1;
+        let sets = new Array(cellCols).fill(0);
+        const getId = (i) => sets[i] || (sets[i] = nextSetId++);
+
+        function carveCell(r, c) {
+          maze.setPassage(r, c);
+        }
+        function carveRight(r, c) {
+          maze.setPassage(r, c + 1);
+        }
+        function carveDown(r, c) {
+          maze.setPassage(r + 1, c);
+        }
+
+        // Start from row 1, step by 2
+        let currentRow = 1;
+
+        function processRow(r, lastRow = false) {
+          // Ensure each cell has a set id
+          for (let x = 0; x < cellCols; x++) getId(x);
+
+          // Horizontal merges (right walls)
+          for (let x = 0; x < cellCols - 1; x++) {
+            const join = lastRow
+              ? sets[x] !== sets[x + 1]
+              : rng.next() < 0.5 && sets[x] !== sets[x + 1];
+            const cc = 1 + x * 2;
+            if (join) {
+              // merge set x+1 into x
+              const from = sets[x + 1],
+                to = sets[x];
+              for (let k = 0; k < cellCols; k++)
+                if (sets[k] === from) sets[k] = to;
+              carveCell(r, cc);
+              carveRight(r, cc);
+              carveCell(r, cc + 2);
+            } else {
+              // keep wall
+              carveCell(r, cc);
+              carveCell(r, cc + 2);
+            }
+          }
+          // last cell in row
+          carveCell(r, 1 + (cellCols - 1) * 2);
+
+          // Vertical connections (down) except last row
+          if (!lastRow) {
+            // For each set, make at least one downward connection
+            const groups = new Map();
+            for (let x = 0; x < cellCols; x++) {
+              const sid = sets[x];
+              if (!groups.has(sid)) groups.set(sid, []);
+              groups.get(sid).push(x);
+            }
+            const newSets = new Array(cellCols).fill(0);
+            for (const [sid, xs] of groups) {
+              // choose at least one index from xs to connect down
+              const candidates = rng.shuffle(xs.slice());
+              const count = Math.max(
+                1,
+                Math.floor(candidates.length * (0.35 + rng.next() * 0.4))
+              );
+              for (let i = 0; i < count; i++) {
+                const x = candidates[i];
+                const cc = 1 + x * 2;
+                carveCell(r, cc);
+                carveDown(r, cc);
+                carveCell(r + 2, cc);
+                newSets[x] = sid; // inherit set id
+              }
+            }
+            // For cells not connected down, new set id next row
+            for (let x = 0; x < cellCols; x++) if (!newSets[x]) newSets[x] = 0;
+            sets = newSets;
+          }
+          onStep?.();
+        }
+
+        // Initialize top boundary as walls; carve as we go
+        function step() {
+          if (currentRow >= H - 1) return true;
+          const lastRow = currentRow >= H - 2;
+          processRow(currentRow, lastRow);
+          currentRow += 2;
+          return currentRow >= H - 1;
+        }
+        return step;
+      }
+
+      // Pathfinding algorithms
+      const Heuristics = {
+        manhattan: (a, b) => Math.abs(a.r - b.r) + Math.abs(a.c - b.c),
+        euclid: (a, b) => Math.hypot(a.r - b.r, a.c - b.c),
+        chebyshev: (a, b) => Math.max(Math.abs(a.r - b.r), Math.abs(a.c - b.c)),
+      };
+
+      function neighbors4(maze, r, c) {
+        const ns = [];
+        const dirs = [
+          [-1, 0],
+          [1, 0],
+          [0, -1],
+          [0, 1],
+        ];
+        for (const [dr, dc] of dirs) {
+          const nr = r + dr,
+            nc = c + dc;
+          if (maze.inBounds(nr, nc) && !maze.isWall(nr, nc))
+            ns.push({ r: nr, c: nc });
+        }
+        return ns;
+      }
+
+      function solveBFS(maze, start, end, onVisit) {
+        const q = [start];
+        const visited = new Set([start.r + "," + start.c]);
+        const parent = new Map();
+        function step() {
+          if (q.length === 0) return { done: true, path: null };
+          const cur = q.shift();
+          if (cur.r === end.r && cur.c === end.c) {
+            return { done: true, path: reconstruct(parent, start, end) };
+          }
+          for (const nb of neighbors4(maze, cur.r, cur.c)) {
+            const key = nb.r + "," + nb.c;
+            if (!visited.has(key)) {
+              visited.add(key);
+              parent.set(key, cur);
+              q.push(nb);
+              onVisit?.(nb, q.length);
+            }
+          }
+          return { done: false };
+        }
+        return step;
+      }
+
+      function solveDFS(maze, start, end, onVisit) {
+        const st = [start];
+        const visited = new Set([start.r + "," + start.c]);
+        const parent = new Map();
+        function step() {
+          if (st.length === 0) return { done: true, path: null };
+          const cur = st.pop();
+          if (cur.r === end.r && cur.c === end.c) {
+            return { done: true, path: reconstruct(parent, start, end) };
+          }
+          for (const nb of neighbors4(maze, cur.r, cur.c)) {
+            const key = nb.r + "," + nb.c;
+            if (!visited.has(key)) {
+              visited.add(key);
+              parent.set(key, cur);
+              st.push(nb);
+              onVisit?.(nb, st.length);
+            }
+          }
+          return { done: false };
+        }
+        return step;
+      }
+
+      function solveDijkstra(maze, start, end, onVisit) {
+        const dist = new Map();
+        const parent = new Map();
+        const pq = new TinyQueue([], (a, b) => a.pri - b.pri);
+        const key = (p) => p.r + "," + p.c;
+        dist.set(key(start), 0);
+        pq.push({ p: start, pri: 0 });
+        const visited = new Set();
+        function step() {
+          if (pq.length === 0) return { done: true, path: null };
+          const { p } = pq.pop();
+          const k = key(p);
+          if (visited.has(k)) return { done: false };
+          visited.add(k);
+          if (p.r === end.r && p.c === end.c) {
+            return { done: true, path: reconstruct(parent, start, end) };
+          }
+          for (const nb of neighbors4(maze, p.r, p.c)) {
+            const nk = key(nb);
+            const nd = (dist.get(k) ?? Infinity) + 1;
+            if (nd < (dist.get(nk) ?? Infinity)) {
+              dist.set(nk, nd);
+              parent.set(nk, p);
+              pq.push({ p: nb, pri: nd });
+              onVisit?.(nb, pq.length);
+            }
+          }
+          return { done: false };
+        }
+        return step;
+      }
+
+      function solveAStar(maze, start, end, h, greedy = false, onVisit) {
+        const g = new Map();
+        const f = new Map();
+        const parent = new Map();
+        const key = (p) => p.r + "," + p.c;
+        const pq = new TinyQueue([], (a, b) => a.f - b.f);
+        g.set(key(start), 0);
+        f.set(key(start), h(start, end));
+        pq.push({ p: start, f: f.get(key(start)) });
+        const closed = new Set();
+        function step() {
+          if (pq.length === 0) return { done: true, path: null };
+          const cur = pq.pop().p;
+          const ck = key(cur);
+          if (closed.has(ck)) return { done: false };
+          if (cur.r === end.r && cur.c === end.c) {
+            return { done: true, path: reconstruct(parent, start, end) };
+          }
+          closed.add(ck);
+          for (const nb of neighbors4(maze, cur.r, cur.c)) {
+            const nk = key(nb);
+            if (closed.has(nk)) continue;
+            const tentative = (g.get(ck) ?? Infinity) + 1;
+            const newG = greedy ? 0 : tentative;
+            if (greedy || tentative < (g.get(nk) ?? Infinity)) {
+              g.set(nk, newG);
+              parent.set(nk, cur);
+              const score = newG + h(nb, end);
+              f.set(nk, score);
+              pq.push({ p: nb, f: score });
+              onVisit?.(nb, pq.length);
+            }
+          }
+          return { done: false };
+        }
+        return step;
+      }
+
+      function solveBidirectionalBFS(maze, start, end, onVisit) {
+        const q1 = [start],
+          q2 = [end];
+        const p1 = new Map(),
+          p2 = new Map();
+        const v1 = new Set([start.r + "," + start.c]),
+          v2 = new Set([end.r + "," + end.c]);
+        let meetKey = null;
+        function expand(queue, visited, parent, otherVisited, tag) {
+          if (!queue.length) return false;
+          const cur = queue.shift();
+          for (const nb of neighbors4(maze, cur.r, cur.c)) {
+            const k = nb.r + "," + nb.c;
+            if (!visited.has(k)) {
+              visited.add(k);
+              parent.set(k, cur);
+              queue.push(nb);
+              onVisit?.(nb, queue.length, tag);
+              if (otherVisited.has(k)) {
+                meetKey = k;
+                return true;
+              }
+            }
+          }
+          return false;
+        }
+        function step() {
+          if (expand(q1, v1, p1, v2, "fwd") || expand(q2, v2, p2, v1, "bwd")) {
+            // reconstruct
+            const meet = meetKey.split(",").map(Number);
+            const meetP = { r: meet[0], c: meet[1] };
+            const path1 = reconstruct(p1, start, meetP);
+            const path2 = reconstructReverse(p2, end, meetP);
+            return { done: true, path: path1.concat(path2.slice(1)) };
+          }
+          if (!q1.length && !q2.length) return { done: true, path: null };
+          return { done: false };
+        }
+        return step;
+      }
+
+      function reconstruct(parent, start, end) {
+        const path = [];
+        let cur = end;
+        const key = (p) => p.r + "," + p.c;
+        while (cur && (cur.r !== start.r || cur.c !== start.c)) {
+          path.push(cur);
+          cur = parent.get(key(cur));
+          if (!cur) break;
+        }
+        path.push(start);
+        path.reverse();
+        return path;
+      }
+      function reconstructReverse(parent, start, meet) {
+        const path = [meet];
+        const key = (p) => p.r + "," + p.c;
+        let cur = meet;
+        while (cur && (cur.r !== start.r || cur.c !== start.c)) {
+          cur = parent.get(key(cur));
+          if (cur) path.push(cur);
+        }
+        return path;
+      }
+
+      // Renderer
+      class Renderer {
+        constructor(canvas, maze, opts) {
+          this.canvas = canvas;
+          this.ctx = canvas.getContext("2d");
+          this.maze = maze;
+          this.cellSize = opts.cellSize ?? 12;
+          this.showGrid = opts.showGrid ?? true;
+          this.scaleForHiDPI();
+          this.visited = new Set(); // "r,c"
+          this.frontier = new Set();
+          this.path = new Set();
+          this.pulseT = 0;
+          this.bgPattern = this.makeBackgroundPattern();
+        }
+        scaleForHiDPI() {
+          const ratio = window.devicePixelRatio || 1;
+          const cssW = this.canvas.clientWidth;
+          const cssH = this.canvas.clientHeight;
+          this.canvas.width = Math.max(1, Math.floor(cssW * ratio));
+          this.canvas.height = Math.max(1, Math.floor(cssH * ratio));
+          this.ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+        }
+        makeBackgroundPattern() {
+          const off = document.createElement("canvas");
+          off.width = 64;
+          off.height = 64;
+          const c = off.getContext("2d");
+          c.fillStyle = "rgba(255,255,255,0.02)";
+          for (let i = 0; i < 200; i++) {
+            c.fillRect(Math.random() * 64, Math.random() * 64, 1, 1);
+          }
+          return this.ctx.createPattern(off, "repeat");
+        }
+        clearHighlights() {
+          this.visited.clear();
+          this.frontier.clear();
+          this.path.clear();
+        }
+        markVisited(p) {
+          this.visited.add(p.r + "," + p.c);
+        }
+        markFrontier(p) {
+          this.frontier.add(p.r + "," + p.c);
+        }
+        setPath(path) {
+          this.path = new Set(path.map((p) => p.r + "," + p.c));
+        }
+        setStartEnd(s, e) {
+          this.start = s;
+          this.end = e;
+        }
+
+        draw() {
+          const ctx = this.ctx;
+          const { rows, cols, grid } = this.maze;
+          const cs = this.cellSize;
+          this.pulseT += 0.016;
+
+          // background
+          ctx.save();
+          ctx.fillStyle = this.bgPattern;
+          ctx.fillRect(0, 0, this.canvas.clientWidth, this.canvas.clientHeight);
+          ctx.restore();
+
+          // center maze
+          const totalW = cols * cs;
+          const totalH = rows * cs;
+          const ox = Math.max(12, (this.canvas.clientWidth - totalW) / 2);
+          const oy = Math.max(12, (this.canvas.clientHeight - totalH) / 2);
+
+          // grid/walls
+          ctx.save();
+          ctx.translate(ox, oy);
+
+          // walls and passages
+          ctx.fillStyle = "rgba(255,255,255,0.04)";
+          ctx.fillRect(-6, -6, totalW + 12, totalH + 12);
+
+          // draw cells
+          for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+              const x = c * cs,
+                y = r * cs;
+              if (grid[r][c] === 0) {
+                ctx.fillStyle = "rgba(0,0,0,0.55)";
+                ctx.fillRect(x, y, cs, cs);
+                ctx.fillStyle = getVar("--wall");
+                ctx.fillRect(x + 1, y + 1, cs - 2, cs - 2);
+              } else {
+                // passage base
+                ctx.fillStyle = "#121528";
+                ctx.fillRect(x, y, cs, cs);
+              }
+            }
+          }
+
+          // visited cells
+          ctx.globalAlpha = 0.9;
+          for (const k of this.visited) {
+            const [r, c] = k.split(",").map(Number);
+            const x = c * cs,
+              y = r * cs;
+            const grad = ctx.createLinearGradient(x, y, x + cs, y + cs);
+            grad.addColorStop(0, "rgba(78,205,196,0.35)");
+            grad.addColorStop(1, "rgba(78,205,196,0.15)");
+            ctx.fillStyle = grad;
+            ctx.fillRect(x + 1, y + 1, cs - 2, cs - 2);
+          }
+          // frontier/open set
+          for (const k of this.frontier) {
+            const [r, c] = k.split(",").map(Number);
+            const x = c * cs,
+              y = r * cs;
+            const a = 0.25 + 0.15 * Math.sin(this.pulseT * 4 + (r + c));
+            ctx.fillStyle = `rgba(255,107,107,${a})`;
+            ctx.fillRect(x + 1, y + 1, cs - 2, cs - 2);
+          }
+          // final path
+          if (this.path.size) {
+            ctx.strokeStyle = getVar("--path");
+            ctx.lineWidth = Math.max(2, Math.floor(cs * 0.35));
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+            ctx.beginPath();
+            const pathPoints = [...this.path].map((k) =>
+              k.split(",").map(Number)
+            );
+            ctx.closePath();
+            for (const [r, c] of pathPoints) {
+              const x = c * cs + cs / 2,
+                y = r * cs + cs / 2;
+              ctx.beginPath();
+              ctx.arc(x, y, cs * 0.2, 0, Math.PI * 2);
+              ctx.stroke();
+            }
+            for (const [r, c] of pathPoints) {
+              const x = c * cs,
+                y = r * cs;
+              ctx.fillStyle = "rgba(255,230,110,0.28)";
+              ctx.fillRect(x + 1, y + 1, cs - 2, cs - 2);
+            }
+          }
+
+          // start/end markers
+          if (this.start) {
+            ctx.fillStyle = getVar("--start");
+            const x = this.start.c * cs,
+              y = this.start.r * cs;
+            ctx.fillRect(x + 2, y + 2, cs - 4, cs - 4);
+          }
+          if (this.end) {
+            const t = this.pulseT;
+            const x = this.end.c * cs + cs / 2,
+              y = this.end.r * cs + cs / 2;
+            ctx.beginPath();
+            ctx.fillStyle = "rgba(255,71,87,0.6)";
+            ctx.arc(
+              x,
+              y,
+              cs * 0.46 * (1 + 0.06 * Math.sin(t * 4)),
+              0,
+              Math.PI * 2
+            );
+            ctx.fill();
+            ctx.fillStyle = getVar("--end");
+            ctx.beginPath();
+            ctx.arc(x, y, cs * 0.28, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          // grid lines
+          if (this.showGrid && cs >= 8) {
+            ctx.strokeStyle = getVar("--grid");
+            ctx.lineWidth = 1;
+            ctx.globalAlpha = 0.35;
+            ctx.beginPath();
+            for (let r = 0; r <= rows; r++) {
+              ctx.moveTo(0, r * cs + 0.5);
+              ctx.lineTo(totalW, r * cs + 0.5);
+            }
+            for (let c = 0; c <= cols; c++) {
+              ctx.moveTo(c * cs + 0.5, 0);
+              ctx.lineTo(c * cs + 0.5, totalH);
+            }
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+          }
+
+          ctx.restore();
+        }
+      }
+
+      function getVar(name) {
+        return getComputedStyle(document.documentElement)
+          .getPropertyValue(name)
+          .trim();
+      }
+
+      // Controller
+      const canvas = document.getElementById("canvas");
+      const statusEl = document.getElementById("status");
+      const rowsEl = document.getElementById("rows");
+      const colsEl = document.getElementById("cols");
+      const algoEl = document.getElementById("algo");
+      const genAlgoEl = document.getElementById("genAlgo");
+      const heuristicEl = document.getElementById("heuristic");
+      const btnGen = document.getElementById("btnGenerate");
+      const btnSolve = document.getElementById("btnSolve");
+      const btnStop = document.getElementById("btnStop");
+      const btnClear = document.getElementById("btnClear");
+      const showGridEl = document.getElementById("showGrid");
+      const autoSolveEl = document.getElementById("autoSolve");
+      const seedEl = document.getElementById("seed");
+      const speedEl = document.getElementById("speed");
+      const speedLabel = document.getElementById("speedLabel");
+      const cellSizeEl = document.getElementById("cellSize");
+      const btnRandSE = document.getElementById("btnRandomizeStartEnd");
+      const btnExport = document.getElementById("btnExport");
+      const btnImport = document.getElementById("btnImport");
+      const stepModeEl = document.getElementById("stepMode");
+      const btnStep = document.getElementById("btnStep");
+
+      let rng = new RNG();
+      let maze = new Maze(+rowsEl.value, +colsEl.value);
+      let renderer = new Renderer(canvas, maze, {
+        cellSize: +cellSizeEl.value,
+        showGrid: showGridEl.checked,
+      });
+      renderer.setStartEnd(maze.start, maze.end);
+
+      let animId = 0;
+      let running = false;
+      let activeStep = null;
+      let mode = null; // 'gen' or 'solve'
+      let lastTime = 0;
+      let speed = +speedEl.value;
+
+      // Step control
+      let stepMode = false; // only affects solving
+      let stepperResult = null; // cache latest step result in step mode
+      function setStepMode(enabled) {
+        stepMode = enabled;
+        btnStep.disabled = !enabled || mode !== "solve";
+        speedEl.disabled = enabled && mode === "solve";
+        if (enabled && mode === "solve") {
+          updateStatus('单步模式: 点击"单步执行"或按空格推进');
+        }
+      }
+
+      function updateStatus(text) {
+        statusEl.textContent = text;
+      }
+
+      function prepareRNG() {
+        const seed = seedEl.value.trim();
+        rng = new RNG(seed || undefined);
+        if (seed) updateStatus(`已设置随机种子: "${seed}"`);
+      }
+
+      function ensureOdd(n) {
+        return n % 2 === 0 ? n - 1 : n;
+      }
+
+      function generate() {
+        stop();
+        prepareRNG();
+        let r = Math.max(5, Math.min(201, +rowsEl.value | 0));
+        let c = Math.max(5, Math.min(201, +colsEl.value | 0));
+        r = ensureOdd(r);
+        c = ensureOdd(c);
+        rowsEl.value = r;
+        colsEl.value = c;
+
+        maze = new Maze(r, c);
+        renderer.maze = maze;
+        renderer.clearHighlights();
+        renderer.setStartEnd(maze.start, maze.end);
+        const onStep = () => {};
+        let stepper;
+        const algo = genAlgoEl.value;
+        if (algo === "dfs") stepper = generateDFS(maze, rng, onStep);
+        else if (algo === "prim") stepper = generatePrim(maze, rng, onStep);
+        else if (algo === "kruskal")
+          stepper = generateKruskal(maze, rng, onStep);
+        else stepper = generateEller(maze, rng, onStep);
+
+        mode = "gen";
+        activeStep = stepper;
+        running = true;
+        setStepMode(stepMode && false); // generation不支持单步，强制关闭
+        updateStatus(`生成中: ${algo.toUpperCase()} ...`);
+        startLoop(() => {
+          // run multiple steps per frame based on speed
+          let done = false;
+          for (let i = 0; i < Math.max(1, Math.floor(20 * speed)); i++) {
+            done = activeStep();
+            if (done) break;
+          }
+          if (done) {
+            running = false;
+            mode = null;
+            activeStep = null;
+            updateStatus(`生成完成. 大小 ${maze.rows}x${maze.cols}`);
+            if (autoSolveEl.checked) solve();
+          }
+        });
+      }
+
+      function solve() {
+        stop();
+        renderer.clearHighlights();
+        const start = maze.start,
+          end = maze.end;
+        renderer.setStartEnd(start, end);
+
+        const mark = (p, frontierSize) => {
+          renderer.markVisited(p);
+          renderer.markFrontier(p);
+        };
+        const algo = algoEl.value;
+        let stepper;
+        if (algo === "bfs") stepper = solveBFS(maze, start, end, mark);
+        else if (algo === "dfs") stepper = solveDFS(maze, start, end, mark);
+        else if (algo === "dijkstra")
+          stepper = solveDijkstra(maze, start, end, mark);
+        else if (algo === "astar")
+          stepper = solveAStar(
+            maze,
+            start,
+            end,
+            Heuristics[heuristicEl.value],
+            false,
+            mark
+          );
+        else if (algo === "greedy")
+          stepper = solveAStar(
+            maze,
+            start,
+            end,
+            Heuristics[heuristicEl.value],
+            true,
+            mark
+          );
+        else
+          stepper = solveBidirectionalBFS(maze, start, end, (p, _, tag) => {
+            renderer.markVisited(p);
+            renderer.markFrontier(p);
+          });
+
+        mode = "solve";
+        activeStep = stepper;
+
+        // If step mode is on, don't auto-iterate. Wait for "step" actions.
+        if (stepMode) {
+          running = false;
+          btnStep.disabled = false;
+          speedEl.disabled = true;
+          updateStatus(`单步模式 · ${algo.toUpperCase()} · 准备开始`);
+          startLoop(() => {}); // keep rendering
+        } else {
+          running = true;
+          btnStep.disabled = true;
+          speedEl.disabled = false;
+          updateStatus(`寻路中: ${algo.toUpperCase()} ...`);
+          startLoop(() => {
+            let result = null;
+            for (let i = 0; i < Math.max(1, Math.floor(80 * speed)); i++) {
+              result = activeStep();
+              if (result?.done) break;
+            }
+            if (result?.done) {
+              finishSolve(result);
+            }
+          });
+        }
+      }
+
+      function performOneStep() {
+        if (mode !== "solve" || !activeStep) return;
+        // only one iteration per click/press
+        const result = activeStep();
+        if (result?.done) {
+          finishSolve(result);
+        } else {
+          // keep drawing highlights
+          renderer.draw();
+          updateStatus("单步模式: 已推进一步");
+        }
+      }
+
+      function finishSolve(result) {
+        if (result.path) {
+          renderer.setPath(result.path);
+          updateStatus(`寻路完成: 路径长度 ${result.path.length}`);
+        } else {
+          updateStatus("寻路失败: 无法到达终点");
+        }
+        mode = null;
+        activeStep = null;
+        running = false;
+        btnStep.disabled = true;
+        speedEl.disabled = false;
+      }
+
+      function randomizeStartEnd() {
+        function randomPassage() {
+          let r, c;
+          do {
+            r = 1 + 2 * rng.int((maze.rows - 1) / 2);
+            c = 1 + 2 * rng.int((maze.cols - 1) / 2);
+          } while (maze.isWall(r, c));
+          return { r, c };
+        }
+        const s = randomPassage();
+        let e = randomPassage();
+        let attempts = 0;
+        while (e.r === s.r && e.c === s.c && attempts++ < 1000)
+          e = randomPassage();
+        maze.start = s;
+        maze.end = e;
+        renderer.setStartEnd(s, e);
+        updateStatus(`起点(${s.r},${s.c}) 终点(${e.r},${e.c}) 已随机设定`);
+      }
+
+      function clearPath() {
+        renderer.clearHighlights();
+        renderer.setPath([]);
+        updateStatus("已清除寻路可视化");
+      }
+
+      function stop() {
+        running = false;
+        mode = null;
+        activeStep = null;
+        cancelAnimationFrame(animId);
+        btnStep.disabled = true;
+        speedEl.disabled = false;
+        updateStatus("已停止");
+      }
+
+      function startLoop(stepCb) {
+        cancelAnimationFrame(animId);
+        lastTime = performance.now();
+        function loop(now) {
+          animId = requestAnimationFrame(loop);
+          const dt = now - lastTime;
+          lastTime = now;
+          renderer.draw();
+          if (running) stepCb(dt);
+        }
+        loop(lastTime);
+      }
+
+      // Export/Import
+      function exportJSON() {
+        const data = {
+          rows: maze.rows,
+          cols: maze.cols,
+          grid: maze.grid.map((row) => Array.from(row)),
+          start: maze.start,
+          end: maze.end,
+        };
+        const blob = new Blob([JSON.stringify(data)], {
+          type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `maze_${maze.rows}x${maze.cols}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
+      function importJSON() {
+        const inp = document.createElement("input");
+        inp.type = "file";
+        inp.accept = "application/json";
+        inp.onchange = () => {
+          const file = inp.files[0];
+          if (!file) return;
+          const fr = new FileReader();
+          fr.onload = () => {
+            try {
+              const data = JSON.parse(fr.result);
+              const m = new Maze(data.rows, data.cols);
+              for (let r = 0; r < m.rows; r++)
+                for (let c = 0; c < m.cols; c++)
+                  m.grid[r][c] = data.grid[r][c] ? 1 : 0;
+              m.start = data.start;
+              m.end = data.end;
+              maze = m;
+              renderer.maze = maze;
+              renderer.setStartEnd(maze.start, maze.end);
+              renderer.clearHighlights();
+              rowsEl.value = maze.rows;
+              colsEl.value = maze.cols;
+              updateStatus(`导入成功: ${maze.rows}x${maze.cols}`);
+            } catch (e) {
+              updateStatus("导入失败: JSON 无效");
+            }
+          };
+          fr.readAsText(file);
+        };
+        inp.click();
+      }
+
+      // UI events
+      btnGen.addEventListener("click", generate);
+      btnSolve.addEventListener("click", solve);
+      btnStop.addEventListener("click", stop);
+      btnClear.addEventListener("click", clearPath);
+      btnRandSE.addEventListener("click", randomizeStartEnd);
+      btnExport.addEventListener("click", exportJSON);
+      btnImport.addEventListener("click", importJSON);
+
+      showGridEl.addEventListener("change", () => {
+        renderer.showGrid = showGridEl.checked;
+      });
+      cellSizeEl.addEventListener("input", () => {
+        renderer.cellSize = +cellSizeEl.value;
+        renderer.scaleForHiDPI();
+      });
+      speedEl.addEventListener("input", () => {
+        speed = +speedEl.value;
+        speedLabel.textContent = `${speed.toFixed(1)}x`;
+      });
+
+      stepModeEl.addEventListener("change", () => {
+        setStepMode(stepModeEl.checked);
+      });
+      btnStep.addEventListener("click", performOneStep);
+      window.addEventListener("keydown", (e) => {
+        if (e.code === "Space") {
+          if (stepMode && mode === "solve") {
+            e.preventDefault();
+            performOneStep();
+          }
+        }
+      });
+
+      window.addEventListener("resize", () => renderer.scaleForHiDPI());
+
+      // Initialize
+      speed = +speedEl.value;
+      speedLabel.textContent = `${speed.toFixed(1)}x`;
+      setStepMode(false);
+      startLoop(() => {});
+      generate();
+    </script>
+  </body>
+</html>

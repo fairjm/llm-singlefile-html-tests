@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>雨滴玻璃效果 - 滑落模拟</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        overflow: hidden;
+        background: #0a0a0a;
+        font-family: Arial, sans-serif;
+      }
+
+      #glass {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        backdrop-filter: blur(5px);
+        -webkit-backdrop-filter: blur(5px);
+      }
+
+      #canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      .fog {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(
+            ellipse at 20% 30%,
+            rgba(255, 255, 255, 0.1) 0%,
+            transparent 50%
+          ),
+          radial-gradient(
+            ellipse at 80% 70%,
+            rgba(255, 255, 255, 0.08) 0%,
+            transparent 50%
+          ),
+          radial-gradient(
+            ellipse at center,
+            rgba(255, 255, 255, 0.05) 0%,
+            transparent 70%
+          );
+        pointer-events: none;
+        animation: fogMove 30s ease-in-out infinite;
+      }
+
+      @keyframes fogMove {
+        0%,
+        100% {
+          opacity: 0.6;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.8;
+          transform: scale(1.05);
+        }
+      }
+
+      .controls {
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        background: rgba(0, 0, 0, 0.8);
+        padding: 20px;
+        border-radius: 15px;
+        color: white;
+        font-size: 14px;
+        z-index: 1000;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .controls h3 {
+        margin-bottom: 15px;
+        color: #87ceeb;
+      }
+
+      .controls label {
+        display: block;
+        margin-bottom: 12px;
+        font-size: 13px;
+      }
+
+      .controls input[type="range"] {
+        width: 180px;
+        margin-left: 10px;
+        vertical-align: middle;
+      }
+
+      .controls span {
+        display: inline-block;
+        width: 35px;
+        text-align: right;
+        font-weight: bold;
+        color: #87ceeb;
+      }
+
+      .info {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 15px;
+        border-radius: 10px;
+        color: white;
+        font-size: 12px;
+        z-index: 1000;
+        max-width: 250px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="glass">
+      <div class="fog"></div>
+      <canvas id="canvas"></canvas>
+    </div>
+
+    <div class="controls">
+      <h3>控制面板</h3>
+      <label>
+        雨量强度:
+        <input type="range" id="rainIntensity" min="1" max="15" value="8" />
+        <span id="intensityValue">8</span>
+      </label>
+      <label>
+        玻璃倾斜度:
+        <input
+          type="range"
+          id="glassAngle"
+          min="0"
+          max="10"
+          value="3"
+          step="0.1"
+        />
+        <span id="angleValue">3</span>
+      </label>
+      <label>
+        表面张力:
+        <input type="range" id="surfaceTension" min="1" max="10" value="5" />
+        <span id="tensionValue">5</span>
+      </label>
+    </div>
+
+    <div class="info">
+      <strong>操作说明：</strong><br />
+      • 雨滴撞击玻璃后会短暂停留<br />
+      • 达到临界质量后开始滑落<br />
+      • 雨滴相遇会融合并加速<br />
+      • 点击屏幕可手动添加雨滴
+    </div>
+
+    <script>
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+
+      // 设置画布大小
+      function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
+      resizeCanvas();
+      window.addEventListener("resize", resizeCanvas);
+
+      // 物理常数
+      const GRAVITY = 0.15; // 重力加速度
+      const ADHESION_FORCE = 0.02; // 附着力
+      const MERGE_DISTANCE = 8; // 融合距离
+      const MIN_DROP_SIZE = 3;
+      const MAX_DROP_SIZE = 12;
+      const CRITICAL_MASS = 25; // 开始滑落的临界质量
+      const TRAIL_FADE_RATE = 0.98; // 水痕消失速率
+
+      // 水痕类
+      class WaterTrail {
+        constructor(x, y, size) {
+          this.points = [{ x, y, size }];
+          this.opacity = 0.3;
+          this.maxAge = 300;
+          this.age = 0;
+        }
+
+        addPoint(x, y, size) {
+          this.points.push({ x, y, size });
+          if (this.points.length > 50) {
+            this.points.shift();
+          }
+        }
+
+        update() {
+          this.age++;
+          this.opacity *= TRAIL_FADE_RATE;
+          return this.opacity > 0.01 && this.age < this.maxAge;
+        }
+
+        draw() {
+          if (this.points.length < 2) return;
+
+          ctx.save();
+          for (let i = 1; i < this.points.length; i++) {
+            const point = this.points[i];
+            const prevPoint = this.points[i - 1];
+            const alpha = this.opacity * (i / this.points.length) * 0.5;
+
+            const gradient = ctx.createLinearGradient(
+              prevPoint.x,
+              prevPoint.y,
+              point.x,
+              point.y
+            );
+            gradient.addColorStop(0, `rgba(180, 200, 255, ${alpha * 0.5})`);
+            gradient.addColorStop(1, `rgba(150, 180, 255, ${alpha})`);
+
+            ctx.strokeStyle = gradient;
+            ctx.lineWidth = point.size * 0.6;
+            ctx.lineCap = "round";
+            ctx.beginPath();
+            ctx.moveTo(prevPoint.x, prevPoint.y);
+            ctx.lineTo(point.x, point.y);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+      }
+
+      // 雨滴类
+      class RainDrop {
+        constructor(x, y, size = null) {
+          this.x = x;
+          this.y = y;
+          this.size =
+            size ||
+            Math.random() * (MAX_DROP_SIZE - MIN_DROP_SIZE) + MIN_DROP_SIZE;
+          this.vx = (Math.random() - 0.5) * 2; // 初始水平速度
+          this.vy = Math.random() * 3 + 2; // 初始垂直速度
+          this.mass = this.size; // 质量
+          this.isAttached = true; // 是否附着在玻璃上
+          this.attachmentTime = 0; // 附着时间
+          this.trail = new WaterTrail(x, y, this.size); // 水痕
+          this.opacity = 0.7 + Math.random() * 0.3;
+          this.wobble = Math.random() * Math.PI * 2; // 摆动相位
+          this.merged = false;
+        }
+
+        update(glassAngle, surfaceTension) {
+          if (this.merged) return;
+
+          this.attachmentTime++;
+
+          // 如果附着在玻璃上
+          if (this.isAttached) {
+            // 计算附着力
+            const adhesion = ADHESION_FORCE * (11 - surfaceTension);
+
+            // 如果质量足够大或附着时间足够长，开始滑落
+            if (this.mass > CRITICAL_MASS || this.attachmentTime > 60) {
+              this.isAttached = false;
+            }
+
+            // 附着时的微小移动
+            this.x += Math.sin(this.wobble + this.attachmentTime * 0.1) * 0.2;
+            this.wobble += 0.05;
+          } else {
+            // 滑落阶段
+            // 应用重力（考虑玻璃倾斜）
+            this.vy += GRAVITY * (1 + glassAngle * 0.1);
+
+            // 应用倾斜导致的水平加速度
+            this.vx += glassAngle * 0.02;
+
+            // 应用空气阻力
+            this.vx *= 0.99;
+            this.vy *= 0.995;
+
+            // 更新位置
+            this.x += this.vx;
+            this.y += this.vy;
+
+            // 边界反弹
+            if (this.x <= this.size || this.x >= canvas.width - this.size) {
+              this.vx *= -0.3;
+              this.x = Math.max(
+                this.size,
+                Math.min(canvas.width - this.size, this.x)
+              );
+            }
+          }
+
+          // 更新水痕
+          if (!this.isAttached) {
+            this.trail.addPoint(this.x, this.y, this.size);
+          }
+        }
+
+        draw() {
+          if (this.merged) return;
+
+          // 绘制水痕
+          this.trail.draw();
+
+          // 绘制雨滴主体
+          ctx.save();
+
+          // 雨滴阴影
+          ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
+          ctx.shadowBlur = this.size * 0.5;
+          ctx.shadowOffsetX = 2;
+          ctx.shadowOffsetY = 2;
+
+          // 雨滴渐变
+          const gradient = ctx.createRadialGradient(
+            this.x - this.size * 0.3,
+            this.y - this.size * 0.3,
+            0,
+            this.x,
+            this.y,
+            this.size
+          );
+          gradient.addColorStop(
+            0,
+            `rgba(255, 255, 255, ${this.opacity * 0.9})`
+          );
+          gradient.addColorStop(
+            0.3,
+            `rgba(220, 240, 255, ${this.opacity * 0.7})`
+          );
+          gradient.addColorStop(
+            0.7,
+            `rgba(180, 210, 255, ${this.opacity * 0.5})`
+          );
+          gradient.addColorStop(
+            1,
+            `rgba(150, 190, 255, ${this.opacity * 0.3})`
+          );
+
+          ctx.fillStyle = gradient;
+          ctx.beginPath();
+
+          // 如果附着在玻璃上，绘制更圆的形状
+          if (this.isAttached) {
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+          } else {
+            // 滑落时绘制稍微拉长的形状
+            const stretch = Math.min(this.vy * 0.1, 1.5);
+            ctx.ellipse(
+              this.x,
+              this.y,
+              this.size,
+              this.size * (1 + stretch),
+              0,
+              0,
+              Math.PI * 2
+            );
+          }
+
+          ctx.fill();
+
+          // 高光效果
+          ctx.shadowColor = "transparent";
+          const highlightGradient = ctx.createRadialGradient(
+            this.x - this.size * 0.4,
+            this.y - this.size * 0.4,
+            0,
+            this.x - this.size * 0.3,
+            this.y - this.size * 0.3,
+            this.size * 0.5
+          );
+          highlightGradient.addColorStop(
+            0,
+            `rgba(255, 255, 255, ${this.opacity * 0.8})`
+          );
+          highlightGradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+
+          ctx.fillStyle = highlightGradient;
+          ctx.beginPath();
+          ctx.arc(
+            this.x - this.size * 0.3,
+            this.y - this.size * 0.3,
+            this.size * 0.4,
+            0,
+            Math.PI * 2
+          );
+          ctx.fill();
+
+          ctx.restore();
+        }
+
+        // 检查碰撞
+        checkCollision(other) {
+          if (this.merged || other.merged) return false;
+
+          const dx = this.x - other.x;
+          const dy = this.y - other.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+
+          return distance < (this.size + other.size) * 0.7;
+        }
+
+        // 融合雨滴
+        merge(other) {
+          if (this.merged || other.merged) return;
+
+          // 计算新的属性
+          const newMass = this.mass + other.mass;
+          const newSize = Math.min(
+            Math.sqrt(newMass) * 1.2,
+            MAX_DROP_SIZE * 1.5
+          );
+
+          // 动量守恒
+          const newVx = (this.vx * this.mass + other.vx * other.mass) / newMass;
+          const newVy = (this.vy * this.mass + other.vy * other.mass) / newMass;
+
+          // 质心位置
+          const newX = (this.x * this.mass + other.x * other.mass) / newMass;
+          const newY = (this.y * this.mass + other.y * other.mass) / newMass;
+
+          // 更新当前雨滴
+          this.x = newX;
+          this.y = newY;
+          this.size = newSize;
+          this.mass = newMass;
+          this.vx = newVx * 1.2; // 融合后速度增加
+          this.vy = newVy * 1.2;
+          this.opacity = Math.min(this.opacity + 0.1, 1);
+
+          // 如果任一雨滴在滑落，融合后也滑落
+          if (!this.isAttached || !other.isAttached) {
+            this.isAttached = false;
+          }
+
+          // 标记另一个雨滴为已融合
+          other.merged = true;
+        }
+      }
+
+      // 雨滴管理器
+      class RainManager {
+        constructor() {
+          this.drops = [];
+          this.trails = []; // 独立的水痕
+          this.rainIntensity = 8;
+          this.glassAngle = 3;
+          this.surfaceTension = 5;
+          this.lastDropTime = 0;
+        }
+
+        update() {
+          const currentTime = Date.now();
+
+          // 生成新雨滴
+          const dropInterval = 1000 / this.rainIntensity;
+          if (currentTime - this.lastDropTime > dropInterval) {
+            this.createDrop();
+            this.lastDropTime = currentTime;
+          }
+
+          // 更新雨滴
+          for (let i = this.drops.length - 1; i >= 0; i--) {
+            const drop = this.drops[i];
+            drop.update(this.glassAngle, this.surfaceTension);
+
+            // 移除超出屏幕或已融合的雨滴
+            if (drop.y > canvas.height + drop.size || drop.merged) {
+              // 保留水痕
+              if (!drop.merged && drop.trail.opacity > 0.1) {
+                this.trails.push(drop.trail);
+              }
+              this.drops.splice(i, 1);
+            }
+          }
+
+          // 碰撞检测和融合
+          for (let i = 0; i < this.drops.length; i++) {
+            for (let j = i + 1; j < this.drops.length; j++) {
+              if (this.drops[i].checkCollision(this.drops[j])) {
+                this.drops[i].merge(this.drops[j]);
+              }
+            }
+          }
+
+          // 更新独立水痕
+          for (let i = this.trails.length - 1; i >= 0; i--) {
+            if (!this.trails[i].update()) {
+              this.trails.splice(i, 1);
+            }
+          }
+        }
+
+        createDrop() {
+          const x = Math.random() * canvas.width;
+          const y = -20;
+          this.drops.push(new RainDrop(x, y));
+        }
+
+        draw() {
+          // 绘制独立水痕
+          this.trails.forEach((trail) => trail.draw());
+
+          // 绘制雨滴
+          this.drops.forEach((drop) => drop.draw());
+        }
+      }
+
+      // 初始化
+      const rainManager = new RainManager();
+
+      // 控制面板
+      const rainIntensitySlider = document.getElementById("rainIntensity");
+      const glassAngleSlider = document.getElementById("glassAngle");
+      const surfaceTensionSlider = document.getElementById("surfaceTension");
+      const intensityValue = document.getElementById("intensityValue");
+      const angleValue = document.getElementById("angleValue");
+      const tensionValue = document.getElementById("tensionValue");
+
+      rainIntensitySlider.addEventListener("input", (e) => {
+        rainManager.rainIntensity = parseInt(e.target.value);
+        intensityValue.textContent = e.target.value;
+      });
+
+      glassAngleSlider.addEventListener("input", (e) => {
+        rainManager.glassAngle = parseFloat(e.target.value);
+        angleValue.textContent = e.target.value;
+      });
+
+      surfaceTensionSlider.addEventListener("input", (e) => {
+        rainManager.surfaceTension = parseInt(e.target.value);
+        tensionValue.textContent = e.target.value;
+      });
+
+      // 鼠标交互
+      canvas.addEventListener("click", (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        rainManager.drops.push(new RainDrop(x, y, 6));
+      });
+
+      // 动画循环
+      function animate() {
+        // 清除画布
+        ctx.fillStyle = "rgba(0, 0, 0, 0.05)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // 更新和绘制
+        rainManager.update();
+        rainManager.draw();
+
+        requestAnimationFrame(animate);
+      }
+
+      // 启动
+      animate();
+    </script>
+  </body>
+</html>

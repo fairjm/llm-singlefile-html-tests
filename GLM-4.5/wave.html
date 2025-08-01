@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>高级波浪背景特效</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: linear-gradient(
+          135deg,
+          #0f0c29 0%,
+          #302b63 50%,
+          #24243e 100%
+        );
+      }
+
+      #waveCanvas {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+      }
+
+      .glass-morphism-dark {
+        background: rgba(0, 0, 0, 0.8);
+        backdrop-filter: blur(15px);
+        -webkit-backdrop-filter: blur(15px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+      }
+
+      .control-panel {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 10;
+        min-width: 320px;
+        transition: transform 0.3s ease, opacity 0.3s ease;
+      }
+
+      .control-panel.hidden {
+        transform: translateX(350px);
+        opacity: 0;
+      }
+
+      .slider {
+        -webkit-appearance: none;
+        appearance: none;
+        background: rgba(255, 255, 255, 0.1);
+        outline: none;
+        opacity: 0.7;
+        transition: opacity 0.2s;
+        border-radius: 10px;
+        height: 6px;
+      }
+
+      .slider:hover {
+        opacity: 1;
+      }
+
+      .slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 18px;
+        height: 18px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        cursor: pointer;
+        border-radius: 50%;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.5);
+      }
+
+      .slider::-moz-range-thumb {
+        width: 18px;
+        height: 18px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        cursor: pointer;
+        border-radius: 50%;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.5);
+      }
+
+      .gradient-text {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      .preset-btn {
+        transition: all 0.3s ease;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .preset-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+      }
+
+      .toggle-btn {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 11;
+        transition: all 0.3s ease;
+      }
+
+      .toggle-btn.panel-hidden {
+        right: 360px;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="waveCanvas"></canvas>
+
+    <!-- 切换按钮 -->
+    <button
+      id="togglePanel"
+      class="toggle-btn glass-morphism-dark text-white p-3 rounded-lg hover:bg-white/10 transition-colors"
+    >
+      <svg
+        class="w-6 h-6"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"
+        ></path>
+      </svg>
+    </button>
+
+    <!-- 控制面板 -->
+    <div
+      id="controlPanel"
+      class="control-panel glass-morphism-dark rounded-2xl p-6"
+    >
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-white text-xl font-bold gradient-text">波浪控制面板</h2>
+        <button
+          id="closePanel"
+          class="text-white/60 hover:text-white transition-colors"
+        >
+          <svg
+            class="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M6 18L18 6M6 6l12 12"
+            ></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label class="text-white/80 text-sm font-medium mb-2 block">
+            波浪强度:
+            <span id="intensityValue" class="text-purple-300">50</span>
+          </label>
+          <input
+            type="range"
+            id="intensitySlider"
+            class="slider w-full"
+            min="10"
+            max="100"
+            value="50"
+          />
+        </div>
+
+        <div>
+          <label class="text-white/80 text-sm font-medium mb-2 block">
+            波浪数量: <span id="waveCountValue" class="text-purple-300">3</span>
+          </label>
+          <input
+            type="range"
+            id="waveCountSlider"
+            class="slider w-full"
+            min="1"
+            max="6"
+            value="3"
+          />
+        </div>
+
+        <div>
+          <label class="text-white/80 text-sm font-medium mb-2 block">
+            动画速度: <span id="speedValue" class="text-purple-300">1.0</span>
+          </label>
+          <input
+            type="range"
+            id="speedSlider"
+            class="slider w-full"
+            min="0.1"
+            max="3"
+            step="0.1"
+            value="1"
+          />
+        </div>
+
+        <div>
+          <label class="text-white/80 text-sm font-medium mb-2 block">
+            变形强度: <span id="morphValue" class="text-purple-300">0.5</span>
+          </label>
+          <input
+            type="range"
+            id="morphSlider"
+            class="slider w-full"
+            min="0"
+            max="1"
+            step="0.1"
+            value="0.5"
+          />
+        </div>
+
+        <div>
+          <label class="text-white/80 text-sm font-medium mb-2 block">
+            透明度: <span id="opacityValue" class="text-purple-300">0.6</span>
+          </label>
+          <input
+            type="range"
+            id="opacitySlider"
+            class="slider w-full"
+            min="0.1"
+            max="1"
+            step="0.1"
+            value="0.6"
+          />
+        </div>
+      </div>
+
+      <div class="mt-6">
+        <h3 class="text-white/80 text-sm font-medium mb-3">预设效果</h3>
+        <div class="grid grid-cols-2 gap-2">
+          <button
+            class="preset-btn text-white/90 text-xs py-2 px-3 rounded-lg"
+            onclick="applyPreset('calm')"
+          >
+            平静
+          </button>
+          <button
+            class="preset-btn text-white/90 text-xs py-2 px-3 rounded-lg"
+            onclick="applyPreset('dynamic')"
+          >
+            动感
+          </button>
+          <button
+            class="preset-btn text-white/90 text-xs py-2 px-3 rounded-lg"
+            onclick="applyPreset('chaos')"
+          >
+            混沌
+          </button>
+          <button
+            class="preset-btn text-white/90 text-xs py-2 px-3 rounded-lg"
+            onclick="applyPreset('organic')"
+          >
+            有机
+          </button>
+        </div>
+      </div>
+
+      <div class="mt-6 flex items-center justify-between">
+        <button
+          id="pauseBtn"
+          class="text-white text-sm bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg transition-colors"
+        >
+          暂停
+        </button>
+        <button
+          class="text-white/80 text-sm bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg transition-colors"
+          onclick="resetToDefault()"
+        >
+          重置
+        </button>
+      </div>
+    </div>
+
+    <div class="fixed bottom-20 left-20 z-10">
+      <div class="glass-morphism-dark rounded-xl p-4">
+        <h1 class="text-white text-3xl font-bold mb-2">流体艺术</h1>
+        <p class="text-white/60 text-sm">体验波浪的变形之美</p>
+      </div>
+    </div>
+
+    <script>
+      const canvas = document.getElementById("waveCanvas");
+      const ctx = canvas.getContext("2d");
+      const controlPanel = document.getElementById("controlPanel");
+      const toggleBtn = document.getElementById("togglePanel");
+      const closeBtn = document.getElementById("closePanel");
+
+      let animationId;
+      let isPaused = false;
+      let time = 0;
+      let isPanelHidden = false;
+
+      // 波浪参数
+      let waveParams = {
+        intensity: 50,
+        waveCount: 3,
+        speed: 1,
+        morphStrength: 0.5,
+        opacity: 0.6,
+      };
+
+      // 渐变色配置
+      const gradients = [
+        ["#667eea", "#764ba2"],
+        ["#f093fb", "#f5576c"],
+        ["#4facfe", "#00f2fe"],
+        ["#43e97b", "#38f9d7"],
+        ["#fa709a", "#fee140"],
+        ["#a8edea", "#fed6e3"],
+      ];
+
+      // 波浪层配置
+      let waveLayers = [];
+
+      // 初始化波浪层
+      function initWaveLayers() {
+        waveLayers = [];
+        for (let i = 0; i < 6; i++) {
+          waveLayers.push({
+            baseAmplitude: 30 + i * 10,
+            baseFrequency: 0.005 + i * 0.002,
+            phaseOffset: (i * Math.PI) / 3,
+            amplitudeMod: 0.3 + Math.random() * 0.4,
+            frequencyMod: 0.2 + Math.random() * 0.3,
+            morphSpeed: 0.5 + Math.random() * 1.5,
+            noiseOffset: Math.random() * 1000,
+          });
+        }
+      }
+
+      // 设置画布大小
+      function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
+
+      // 创建渐变
+      function createGradient(y, colors) {
+        const gradient = ctx.createLinearGradient(0, y - 200, 0, y + 200);
+        gradient.addColorStop(0, colors[0] + "20");
+        gradient.addColorStop(0.3, colors[1] + "60");
+        gradient.addColorStop(0.7, colors[0] + "60");
+        gradient.addColorStop(1, colors[1] + "20");
+        return gradient;
+      }
+
+      // 噪声函数（用于自然变形）
+      function noise(x, y, t) {
+        return (
+          Math.sin(x * 0.01 + t) *
+          Math.cos(y * 0.01 + t) *
+          Math.sin((x + y) * 0.005 + t * 0.5)
+        );
+      }
+
+      // 绘制变形波浪
+      function drawMorphingWave(layer, yOffset, colors) {
+        ctx.beginPath();
+        ctx.moveTo(0, canvas.height);
+
+        const points = [];
+        const segmentWidth = canvas.width / 150; // 增加分段数使波浪更平滑
+
+        for (let x = 0; x <= canvas.width; x += segmentWidth) {
+          // 基础正弦波
+          let y =
+            yOffset +
+            Math.sin(
+              x * layer.baseFrequency +
+                time * waveParams.speed +
+                layer.phaseOffset
+            ) *
+              layer.baseAmplitude;
+
+          // 添加第二层正弦波（创造复杂波形）
+          y +=
+            Math.sin(
+              x * layer.baseFrequency * 2.3 +
+                time * waveParams.speed * 1.7 +
+                layer.phaseOffset
+            ) *
+            layer.baseAmplitude *
+            0.4;
+
+          // 添加第三层正弦波（增加细节）
+          y +=
+            Math.sin(
+              x * layer.baseFrequency * 3.7 +
+                time * waveParams.speed * 0.8 +
+                layer.phaseOffset
+            ) *
+            layer.baseAmplitude *
+            0.2;
+
+          // 添加噪声变形
+          const noiseValue = noise(
+            x,
+            yOffset,
+            time * layer.morphSpeed + layer.noiseOffset
+          );
+          y += noiseValue * waveParams.morphStrength * 30;
+
+          // 动态振幅调制
+          const amplitudeMod = 1 + Math.sin(time * layer.amplitudeMod) * 0.3;
+          y = yOffset + (y - yOffset) * amplitudeMod;
+
+          // 动态频率调制
+          const frequencyMod = 1 + Math.sin(time * layer.frequencyMod) * 0.2;
+          const adjustedX = x * frequencyMod;
+          y =
+            yOffset +
+            Math.sin(
+              adjustedX * layer.baseFrequency +
+                time * waveParams.speed +
+                layer.phaseOffset
+            ) *
+              layer.baseAmplitude *
+              amplitudeMod;
+
+          points.push({ x, y });
+        }
+
+        // 使用贝塞尔曲线平滑连接
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length - 2; i++) {
+          const xc = (points[i].x + points[i + 1].x) / 2;
+          const yc = (points[i].y + points[i + 1].y) / 2;
+          ctx.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
+        }
+
+        // 最后两个点
+        ctx.quadraticCurveTo(
+          points[points.length - 2].x,
+          points[points.length - 2].y,
+          points[points.length - 1].x,
+          points[points.length - 1].y
+        );
+
+        ctx.lineTo(canvas.width, canvas.height);
+        ctx.closePath();
+
+        // 添加磨砂效果
+        ctx.filter = "blur(1.5px)";
+        ctx.fillStyle = createGradient(yOffset, colors);
+        ctx.globalAlpha = waveParams.opacity;
+        ctx.fill();
+        ctx.filter = "none";
+      }
+
+      // 动画循环
+      function animate() {
+        if (!isPaused) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          const waveCount = Math.min(waveParams.waveCount, waveLayers.length);
+
+          // 从底部开始绘制波浪，确保显示完整
+          for (let i = 0; i < waveCount; i++) {
+            const layer = waveLayers[i];
+            const yOffset = canvas.height - 150 - i * 60; // 从底部向上偏移
+            const colors = gradients[i % gradients.length];
+
+            // 调整层参数基于全局设置
+            layer.baseAmplitude = waveParams.intensity * (0.8 + i * 0.3);
+
+            drawMorphingWave(layer, yOffset, colors);
+          }
+
+          time += 0.02;
+        }
+
+        animationId = requestAnimationFrame(animate);
+      }
+
+      // 更新参数
+      function updateParams() {
+        waveParams.intensity = parseInt(
+          document.getElementById("intensitySlider").value
+        );
+        waveParams.waveCount = parseInt(
+          document.getElementById("waveCountSlider").value
+        );
+        waveParams.speed = parseFloat(
+          document.getElementById("speedSlider").value
+        );
+        waveParams.morphStrength = parseFloat(
+          document.getElementById("morphSlider").value
+        );
+        waveParams.opacity = parseFloat(
+          document.getElementById("opacitySlider").value
+        );
+
+        document.getElementById("intensityValue").textContent =
+          waveParams.intensity;
+        document.getElementById("waveCountValue").textContent =
+          waveParams.waveCount;
+        document.getElementById("speedValue").textContent =
+          waveParams.speed.toFixed(1);
+        document.getElementById("morphValue").textContent =
+          waveParams.morphStrength.toFixed(1);
+        document.getElementById("opacityValue").textContent =
+          waveParams.opacity.toFixed(1);
+      }
+
+      // 应用预设
+      function applyPreset(preset) {
+        switch (preset) {
+          case "calm":
+            setSliderValues(30, 2, 0.5, 0.2, 0.4);
+            break;
+          case "dynamic":
+            setSliderValues(70, 4, 1.8, 0.8, 0.7);
+            break;
+          case "chaos":
+            setSliderValues(90, 6, 2.5, 1.0, 0.8);
+            break;
+          case "organic":
+            setSliderValues(50, 3, 1.2, 0.6, 0.6);
+            break;
+        }
+        updateParams();
+      }
+
+      // 设置滑块值
+      function setSliderValues(intensity, count, speed, morph, opacity) {
+        document.getElementById("intensitySlider").value = intensity;
+        document.getElementById("waveCountSlider").value = count;
+        document.getElementById("speedSlider").value = speed;
+        document.getElementById("morphSlider").value = morph;
+        document.getElementById("opacitySlider").value = opacity;
+      }
+
+      // 重置为默认值
+      function resetToDefault() {
+        setSliderValues(50, 3, 1, 0.5, 0.6);
+        updateParams();
+      }
+
+      // 切换面板显示/隐藏
+      function togglePanel() {
+        isPanelHidden = !isPanelHidden;
+        controlPanel.classList.toggle("hidden");
+        toggleBtn.classList.toggle("panel-hidden");
+      }
+
+      // 暂停/继续
+      document
+        .getElementById("pauseBtn")
+        .addEventListener("click", function () {
+          isPaused = !isPaused;
+          this.textContent = isPaused ? "继续" : "暂停";
+        });
+
+      // 事件监听器
+      document
+        .getElementById("intensitySlider")
+        .addEventListener("input", updateParams);
+      document
+        .getElementById("waveCountSlider")
+        .addEventListener("input", updateParams);
+      document
+        .getElementById("speedSlider")
+        .addEventListener("input", updateParams);
+      document
+        .getElementById("morphSlider")
+        .addEventListener("input", updateParams);
+      document
+        .getElementById("opacitySlider")
+        .addEventListener("input", updateParams);
+
+      toggleBtn.addEventListener("click", togglePanel);
+      closeBtn.addEventListener("click", togglePanel);
+
+      window.addEventListener("resize", resizeCanvas);
+
+      // 初始化
+      resizeCanvas();
+      initWaveLayers();
+      animate();
+    </script>
+  </body>
+</html>
