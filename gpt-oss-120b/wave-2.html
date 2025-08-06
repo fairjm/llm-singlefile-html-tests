@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>海浪背景特效（单文件）</title>
+    <!-- 1️⃣ CDN：Three.js (r158) -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
+    <!-- 2️⃣ CDN：dat.GUI 用于 UI 控件 -->
+    <script src="https://cdn.jsdelivr.net/npm/dat.gui@0.7.9/build/dat.gui.min.js"></script>
+
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #02101a;
+      }
+      canvas {
+        display: block;
+      }
+      /* 背景渐变 + 磨砂质感 */
+      #overlay {
+        position: fixed;
+        inset: 0;
+        background: linear-gradient(135deg, #0a172c, #00152e);
+        pointer-events: none;
+        backdrop-filter: blur(30px) saturate(180%);
+        transition: background 6s ease;
+        z-index: 0;
+      }
+      /* 简单的 UI 盒子 */
+      .dg {
+        z-index: 1 !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="overlay"></div>
+    <script type="module">
+      /* -------------------------------------------------
+   Three.js 场景初始化
+---------------------------------------------------*/
+      import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/controls/OrbitControls.js";
+      import { Water } from "https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/objects/Water2.js";
+      import { Sky } from "https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/objects/Sky.js";
+
+      let scene, camera, renderer, water, controls, sky;
+      let clock = new THREE.Clock();
+
+      // ---------- 基本渲染器 ----------
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setClearColor(0x000000, 0);
+      document.body.appendChild(renderer.domElement);
+
+      // ---------- 场景 ----------
+      scene = new THREE.Scene();
+
+      // ---------- 相机 ----------
+      camera = new THREE.PerspectiveCamera(
+        55,
+        window.innerWidth / window.innerHeight,
+        1,
+        20000
+      );
+      camera.position.set(0, 30, 100);
+
+      // ---------- 控制器 (仅用于调试) ----------
+      controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.maxPolarAngle = Math.PI / 2 - 0.05;
+      controls.minDistance = 30;
+      controls.maxDistance = 200;
+
+      // ---------- 天空 ----------
+      sky = new Sky();
+      sky.scale.setScalar(10000);
+      scene.add(sky);
+
+      const skyUniforms = sky.material.uniforms;
+      skyUniforms["turbidity"].value = 10;
+      skyUniforms["rayleigh"].value = 2;
+      skyUniforms["mieCoefficient"].value = 0.005;
+      skyUniforms["mieDirectionalG"].value = 0.8;
+
+      // 直接把光源放在天光方向上，产生海面反射
+      const sun = new THREE.Vector3();
+
+      function updateSun() {
+        const theta = Math.PI * (0.5 - 0.45); // 光的高度 (0~π)
+        const phi = 2 * Math.PI * 0.25; // 光的方位 (0~2π)
+
+        sun.setFromSphericalCoords(1, theta, phi);
+        sky.material.uniforms["sunPosition"].value.copy(sun);
+        if (water)
+          water.material.uniforms["sunDirection"].value.copy(sun).normalize();
+      }
+      updateSun();
+
+      // ---------- 海面 ----------
+      const waterGeometry = new THREE.PlaneGeometry(10000, 10000);
+      water = new Water(waterGeometry, {
+        textureWidth: 512,
+        textureHeight: 512,
+        waterNormals: new THREE.TextureLoader().load(
+          "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r158/examples/textures/waternormals.jpg",
+          (tex) => {
+            tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+          }
+        ),
+        sunDirection: new THREE.Vector3(),
+        sunColor: 0xffffff,
+        waterColor: 0x001e4d,
+        distortionScale: 3.5,
+        fog: false,
+        // 初始参数（后面会被 GUI 覆盖）
+        alpha: 1.0,
+        side: THREE.DoubleSide,
+        clipBias: 0,
+      });
+      water.rotation.x = -Math.PI / 2;
+      scene.add(water);
+
+      // ---------- 交互面板 ----------
+      const gui = new dat.GUI({ width: 300 });
+      const params = {
+        waveHeight: 1.0, // 高度强度（distortionScale）
+        waveScale: 1.0, // 噪声贴图的缩放（controls how many waves)
+        waveSpeed: 0.5, // 动画速度 (单位：周期秒)
+        fogColor: "#02101a",
+        overlayStart: "#0a172c",
+        overlayEnd: "#00152e",
+      };
+
+      gui
+        .add(params, "waveHeight", 0.2, 5)
+        .name("波浪强度")
+        .onChange((v) => {
+          water.material.uniforms["distortionScale"].value = v;
+        });
+      gui
+        .add(params, "waveScale", 0.5, 4)
+        .name("波浪数量/尺度")
+        .onChange((v) => {
+          water.material.uniforms["size"].value = v;
+        });
+      gui
+        .add(params, "waveSpeed", 0.1, 2)
+        .name("波浪速度（秒/周期）")
+        .onChange((v) => {
+          speedFactor = v;
+        });
+      gui
+        .addColor(params, "overlayStart")
+        .name("背景渐变起点")
+        .onChange(updateOverlay);
+      gui
+        .addColor(params, "overlayEnd")
+        .name("背景渐变终点")
+        .onChange(updateOverlay);
+      gui
+        .addColor(params, "fogColor")
+        .name("雾/背景颜色")
+        .onChange((c) => {
+          renderer.setClearColor(c);
+        });
+      gui.close();
+
+      let speedFactor = params.waveSpeed; // 供动画循环使用
+
+      function updateOverlay() {
+        const overlay = document.getElementById("overlay");
+        overlay.style.background = `linear-gradient(135deg,${params.overlayStart},${params.overlayEnd})`;
+      }
+      updateOverlay();
+
+      // ---------- 调整大小 ----------
+      window.addEventListener("resize", () => {
+        const w = window.innerWidth,
+          h = window.innerHeight;
+        renderer.setSize(w, h);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+      });
+
+      /* -------------------------------------------------
+   主渲染循环
+---------------------------------------------------*/
+      function render() {
+        const delta = clock.getDelta();
+        const elapsed = clock.getElapsedTime();
+
+        // 把时间送进 Water 的 shader（内部使用）
+        water.material.uniforms["time"].value = elapsed * speedFactor;
+
+        // 让相机稍微环绕（保持在水平面上），营造轻微的漂移感
+        const radius = 100;
+        camera.position.x = Math.sin(elapsed * 0.03) * radius;
+        camera.position.z = Math.cos(elapsed * 0.03) * radius;
+        camera.lookAt(0, 0, 0);
+
+        controls.update();
+        renderer.render(scene, camera);
+        requestAnimationFrame(render);
+      }
+      render();
+    </script>
+  </body>
+</html>

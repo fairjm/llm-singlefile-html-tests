@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>❄️ 雪花飘落 Demo</title>
+    <!-- TailwindCSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      /* 让 canvas 完全覆盖页面并置于最上层 */
+      #snow-canvas {
+        position: fixed;
+        inset: 0;
+        pointer-events: none; /* 不阻拦鼠标操作 */
+        z-index: 9999;
+      }
+      /* 简单的“堆雪”底部形状 */
+      #ground {
+        position: fixed;
+        left: 0;
+        bottom: 0;
+        width: 100%;
+        height: 80px; /* 初始高度，雪会往上堆 */
+        background: linear-gradient(to top, #fff, #fff0);
+        pointer-events: none;
+        z-index: 9998;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-900 text-white relative overflow-hidden">
+    <!-- ===================== 控制面板 ===================== -->
+    <div
+      class="fixed top-2 left-1/2 -translate-x-1/2 z-50 bg-gray-800 bg-opacity-80 rounded-xl px-4 py-2 flex gap-4 text-sm"
+    >
+      <label class="flex flex-col items-center">
+        <span class="text-xs mb-1">风向（°）</span>
+        <input
+          id="wind-angle"
+          type="range"
+          min="-90"
+          max="90"
+          value="0"
+          class="w-32"
+        />
+      </label>
+      <label class="flex flex-col items-center">
+        <span class="text-xs mb-1">风速 (px/s)</span>
+        <input
+          id="wind-speed"
+          type="range"
+          min="0"
+          max="200"
+          value="60"
+          class="w-32"
+        />
+      </label>
+      <label class="flex flex-col items-center">
+        <span class="text-xs mb-1">下落速度 (px/s)</span>
+        <input
+          id="fall-speed"
+          type="range"
+          min="20"
+          max="300"
+          value="80"
+          class="w-32"
+        />
+      </label>
+      <label class="flex flex-col items-center">
+        <span class="text-xs mb-1">密度 (flakes/1000ms)</span>
+        <input
+          id="density"
+          type="range"
+          min="5"
+          max="100"
+          value="30"
+          class="w-32"
+        />
+      </label>
+    </div>
+
+    <!-- ===================== 随机页面元素（雪的“障碍物”） ===================== -->
+    <div id="content" class="p-8 grid grid-cols-4 gap-4">
+      <!-- 这里的元素会在 JS 中随机生成并自动加上 .snow-obstacle 类 -->
+    </div>
+
+    <!-- 雪底（积雪） -->
+    <div id="ground"></div>
+
+    <!-- Canvas：绘制雪花 -->
+    <canvas id="snow-canvas"></canvas>
+
+    <!-- ===================== 脚本 ===================== -->
+    <script>
+      // ---------- 基础配置 ----------
+      const canvas = document.getElementById("snow-canvas");
+      const ctx = canvas.getContext("2d");
+      const groundDiv = document.getElementById("ground");
+
+      // 让 canvas 大小跟随窗口
+      function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
+      window.addEventListener("resize", resizeCanvas);
+      resizeCanvas();
+
+      // ---------- UI 参数 ----------
+      const ui = {
+        windAngle: document.getElementById("wind-angle"), // 0 = 向右，负 = 向左
+        windSpeed: document.getElementById("wind-speed"),
+        fallSpeed: document.getElementById("fall-speed"),
+        density: document.getElementById("density"),
+      };
+
+      // 转成每帧的增量（像素/帧），使用 60fps 近似
+      function getParams() {
+        const angle = (ui.windAngle.value * Math.PI) / 180; // 弧度
+        const windX = (Math.cos(angle) * ui.windSpeed.value) / 60; // x 方向每帧增量
+        const fallY = ui.fallSpeed.value / 60; // y 方向每帧增量
+        const density = ui.density.value; // 每 1000 ms 产生的雪花数
+        return { windX, fallY, density };
+      }
+
+      // ---------- 随机页面元素 ----------
+      const contentDiv = document.getElementById("content");
+      const obstacleRects = []; // 存放障碍物的 DOMRect（实时更新）
+
+      function createRandomElements(count = 1) {
+        const colors = ["red", "green", "blue", "yellow", "purple", "orange"];
+        for (let i = 0; i < count; i++) {
+          const el = document.createElement("div");
+          el.className = "snow-obstacle rounded-lg shadow-lg p-4 text-center";
+          el.style.background =
+            colors[Math.floor(Math.random() * colors.length)];
+          el.style.height = `${10 + Math.random() * 200}px`;
+          el.textContent = `块 ${i + 1}`;
+          // 随机位置：使用 Tailwind 的 grid 自动布局即可
+          contentDiv.appendChild(el);
+        }
+        updateObstacles();
+      }
+
+      // 把所有 .snow-obstacle 的位置存进 obstacleRects
+      function updateObstacles() {
+        obstacleRects.length = 0;
+        document.querySelectorAll(".snow-obstacle").forEach((el) => {
+          const rect = el.getBoundingClientRect();
+          // 转成相对 canvas (页面左上角 = 0,0)
+          obstacleRects.push({
+            left: rect.left,
+            right: rect.right,
+            top: rect.top,
+            bottom: rect.bottom,
+            el: el, // 保留引用以便以后可以移除或改变
+          });
+        });
+      }
+      // 页面变化时（如窗口缩放）重新计算障碍物位置
+      window.addEventListener("resize", updateObstacles);
+      // 初始生成
+      createRandomElements();
+
+      // ---------- 雪花对象 ----------
+      class Snowflake {
+        constructor() {
+          this.r = Math.random() * 2 + 1; // 半径 1~3px
+          this.x = Math.random() * canvas.width; // 初始 X
+          this.y = -this.r * 2; // 初始在视口上方
+          this.vx = 0; // 风向后面会更新
+          this.vy = 0; // 下落速度后面会更新
+          this.landed = false; // 是否已落地/堆在元素上
+        }
+
+        // 根据 UI 参数设置速度
+        setSpeed(windX, fallY) {
+          this.vx = windX + (Math.random() - 0.5) * 0.3; // 小幅抖动让雪更自然
+          this.vy = fallY + Math.random() * 0.5;
+        }
+
+        // 检测是否与障碍物碰撞
+        checkCollision() {
+          // 与页面底部（groundDiv）碰撞
+          const groundTop = window.innerHeight - groundDiv.offsetHeight;
+          if (this.y + this.r >= groundTop) {
+            this.y = groundTop - this.r;
+            return true;
+          }
+
+          // 与任意障碍物的顶部碰撞（简化为矩形碰撞）
+          for (let o of obstacleRects) {
+            // 只检测雪花在障碍物水平范围内
+            if (this.x >= o.left - this.r && this.x <= o.right + this.r) {
+              // 雪花已经在障碍物之上且即将穿透
+              if (this.y + this.r >= o.top && this.y - this.r <= o.top) {
+                this.y = o.top - this.r; // 把雪花贴到障碍物顶部
+                return true;
+              }
+            }
+          }
+          return false;
+        }
+
+        update(windX, fallY) {
+          if (this.landed) return;
+          this.setSpeed(windX, fallY);
+          this.x += this.vx;
+          this.y += this.vy;
+
+          // 环绕屏幕（左/右）
+          if (this.x > canvas.width + this.r) this.x = -this.r;
+          if (this.x < -this.r) this.x = canvas.width + this.r;
+
+          // 检测落地
+          if (this.checkCollision()) {
+            this.landed = true;
+            // 加到已落地的集合中，以便后面绘制
+            landedFlakes.push(this);
+          }
+        }
+
+        draw(ctx) {
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+          ctx.fillStyle = "rgba(255,255,255,0.9)";
+          ctx.fill();
+        }
+      }
+
+      // ---------- 雪花集合 ----------
+      const activeFlakes = []; // 正在飘落的
+      const landedFlakes = []; // 已经堆积的（包括底部和障碍物）
+
+      // ---------- 主循环 ----------
+      let lastSpawn = 0;
+      function animate(timestamp) {
+        const { windX, fallY, density } = getParams();
+
+        // 清屏
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 产生新雪花（每 1000ms 按 density 产生）
+        if (timestamp - lastSpawn > 1000 / Math.max(density, 1)) {
+          const flake = new Snowflake();
+          flake.setSpeed(windX, fallY);
+          activeFlakes.push(flake);
+          lastSpawn = timestamp;
+        }
+
+        // 更新并绘制活跃的雪花
+        for (let i = activeFlakes.length - 1; i >= 0; i--) {
+          const flake = activeFlakes[i];
+          flake.update(windX, fallY);
+          if (flake.landed) {
+            activeFlakes.splice(i, 1); // 从活跃列表移除
+          } else {
+            flake.draw(ctx);
+          }
+        }
+
+        // 绘制已经堆积的雪花（保持不动）
+        for (const flake of landedFlakes) {
+          flake.draw(ctx);
+        }
+
+        requestAnimationFrame(animate);
+      }
+      requestAnimationFrame(animate);
+    </script>
+  </body>
+</html>

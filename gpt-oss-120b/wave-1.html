@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>高级感背景波浪特效（单文件）</title>
+    <!-- 1️⃣ CDN：Simplex Noise（用于生成平滑噪声） -->
+    <script src="https://cdn.jsdelivr.net/npm/simplex-noise@3.0.0/simplex-noise.min.js"></script>
+    <!-- 2️⃣ CDN：tinycolor2（处理渐变色） -->
+    <script src="https://cdn.jsdelivr.net/npm/tinycolor2@1.6.0/dist/tinycolor-min.js"></script>
+
+    <style>
+      /* 基础全屏布局 */
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        height: 100%;
+      }
+      body {
+        /* 1️⃣ 颜色渐变 + 磨砂（backdrop‑filter） */
+        background: linear-gradient(
+          135deg,
+          #0e0e2c,
+          /* 深蓝 */ #2a2745
+        ); /* 更浅的蓝 */
+        background-size: 200% 200%;
+        animation: bgShift 30s linear infinite;
+        /* 磨砂质感 */
+        backdrop-filter: blur(24px) saturate(150%);
+      }
+      @keyframes bgShift {
+        0% {
+          background-position: 0% 0%;
+        }
+        50% {
+          background-position: 100% 0%;
+        }
+        100% {
+          background-position: 0% 0%;
+        }
+      }
+
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+        pointer-events: none; /* 让下层的交互控件不受 canvas 干扰 */
+      }
+
+      /* 参数面板 */
+      #ui {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: rgba(255, 255, 255, 0.08);
+        padding: 15px 20px;
+        border-radius: 8px;
+        backdrop-filter: blur(12px) saturate(180%);
+        color: #fff;
+        font-family: system-ui, Helvetica, Arial, sans-serif;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      }
+      #ui label {
+        display: block;
+        margin: 8px 0 4px;
+        font-size: 0.9rem;
+      }
+      #ui input {
+        width: 100%;
+      }
+    </style>
+  </head>
+
+  <body>
+    <canvas id="wave"></canvas>
+
+    <div id="ui">
+      <label
+        >波浪强度 (Amplitude)
+        <input id="amp" type="range" min="10" max="150" step="1" value="70"
+      /></label>
+      <label
+        >波浪数量 (Count)
+        <input id="count" type="range" min="1" max="10" step="1" value="4"
+      /></label>
+      <label
+        >动画时长 (Seconds)
+        <input id="duration" type="range" min="5" max="30" step="1" value="12"
+      /></label>
+    </div>
+
+    <script>
+      /* ---------- 参数 ---------- */
+      const cfg = {
+        amplitude: 70, // 波幅（像素）
+        count: 4, // 波的数量（层数）
+        duration: 12, // 完整一次波动周期（秒）
+      };
+
+      document.getElementById("amp").oninput = (e) => {
+        cfg.amplitude = +e.target.value;
+      };
+      document.getElementById("count").oninput = (e) => {
+        cfg.count = +e.target.value;
+      };
+      document.getElementById("duration").oninput = (e) => {
+        cfg.duration = +e.target.value;
+      };
+
+      /* ---------- 画布 & 基础 ---------- */
+      const canvas = document.getElementById("wave");
+      const ctx = canvas.getContext("2d");
+      function resize() {
+        canvas.width = innerWidth;
+        canvas.height = innerHeight;
+      }
+      window.addEventListener("resize", resize);
+      resize();
+
+      /* ---------- 简单噪声 ---------- */
+      const simplex = new SimplexNoise();
+
+      function getWaveY(x, time, layer) {
+        // 基本正弦 + 噪声，使波浪有漂浮感
+        const frequency = 0.002 + layer * 0.0006; // 每层频率稍有区别
+        const base = Math.sin((x + time * 0.2) * frequency * 2 * Math.PI);
+        const noise = simplex.noise2D(x * 0.0015 + time * 0.0007, layer * 10);
+        return base * cfg.amplitude + noise * cfg.amplitude * 0.4;
+      }
+
+      /* ---------- 渐变颜色（随着层数） ---------- */
+      function getGradient(layer) {
+        // 颜色从浅蓝到深紫，再加一点白色的高光
+        const base = tinycolor("#2a2745")
+          .mix("#0000ff", (layer / cfg.count) * 100)
+          .toRgbString();
+        const highlight = tinycolor("#ffffff").setAlpha(0.15).toRgbString();
+        const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        const pos = layer / cfg.count;
+        grad.addColorStop(0, base);
+        grad.addColorStop(pos * 0.7, base);
+        grad.addColorStop(1, highlight);
+        return grad;
+      }
+
+      /* ---------- 动画循环 ---------- */
+      let startTime = null;
+      function draw(timestamp) {
+        if (!startTime) startTime = timestamp;
+        const elapsed = (timestamp - startTime) / 1000; // 秒
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 按层绘制
+        for (let l = 0; l < cfg.count; l++) {
+          const layer = l + 1;
+          const path = new Path2D();
+          const offsetY = (canvas.height / (cfg.count + 1)) * (l + 1);
+
+          // 起点
+          path.moveTo(0, offsetY);
+          // 曲线
+          for (let x = 0; x <= canvas.width; x += 3) {
+            const y = offsetY + getWaveY(x, elapsed, layer);
+            path.lineTo(x, y);
+          }
+          // 收尾闭合
+          path.lineTo(canvas.width, canvas.height);
+          path.lineTo(0, canvas.height);
+          path.closePath();
+
+          // 渐变 + 透明度
+          ctx.fillStyle = getGradient(l);
+          ctx.globalAlpha = 0.6 / (l + 0.5); // 前后层透明度递减
+          ctx.fill(path);
+        }
+
+        requestAnimationFrame(draw);
+      }
+      requestAnimationFrame(draw);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <title>雨滴在玻璃上滑落 - 單文件 Demo</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: #111;
+      }
+      #canvas {
+        display: block;
+      }
+      .gui {
+        position: fixed;
+        top: 0;
+        right: 0;
+        z-index: 10;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+
+    <!-- Matter.js (2D physics) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <!-- dat.GUI (ui for tweaking) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.7/dat.gui.min.js"></script>
+
+    <script>
+      /* --------------------------------------------------------------
+   基本設定
+----------------------------------------------------------------*/
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+
+      function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
+      window.addEventListener("resize", resize);
+      resize();
+
+      /* --------------------------------------------------------------
+   Matter.js Engine / World
+----------------------------------------------------------------*/
+      const Engine = Matter.Engine,
+        Render = Matter.Render,
+        World = Matter.World,
+        Bodies = Matter.Bodies,
+        Body = Matter.Body,
+        Events = Matter.Events,
+        Composite = Matter.Composite;
+
+      const engine = Engine.create();
+      const world = engine.world;
+
+      // 重力向下（模擬雨滴滑落）
+      world.gravity.x = 0;
+      world.gravity.y = 1; // 這個值會被 dat.GUI 所控制
+      world.gravity.scale = 0.001; // 讓速度不會太快
+
+      // 玻璃邊框（左、右、底）防止雨滴跑出畫面
+      const wallThickness = 50;
+      const walls = [
+        Bodies.rectangle(
+          -wallThickness / 2,
+          canvas.height / 2,
+          wallThickness,
+          canvas.height,
+          { isStatic: true }
+        ), // left
+        Bodies.rectangle(
+          canvas.width + wallThickness / 2,
+          canvas.height / 2,
+          wallThickness,
+          canvas.height,
+          { isStatic: true }
+        ), // right
+        Bodies.rectangle(
+          canvas.width / 2,
+          canvas.height + wallThickness / 2,
+          canvas.width,
+          wallThickness,
+          { isStatic: true }
+        ), // bottom
+      ];
+      World.add(world, walls);
+
+      /* --------------------------------------------------------------
+   參數控制介面 (dat.GUI)
+----------------------------------------------------------------*/
+      const params = {
+        gravity: 1, // 垂直重力係數 (0~2)
+        windX: 0, // 風向 X (每幀施加的水平力)
+        windY: 0, // 風向 Y (每幀施加的垂直力，可正可負)
+        friction: 0.02, // 表面摩擦 (越小越滑)
+        airFriction: 0.02, // 空氣阻力
+        spawnRate: 300, // 雨滴產生間隔 (ms)
+        minRadius: 2,
+        maxRadius: 5,
+      };
+
+      const gui = new dat.GUI({ width: 300 });
+      gui
+        .add(params, "gravity", 0, 2, 0.01)
+        .name("垂直重力")
+        .onChange((v) => (world.gravity.y = v));
+      gui.add(params, "windX", -0.001, 0.001, 0.00001).name("水平風力");
+      gui.add(params, "windY", -0.001, 0.001, 0.00001).name("垂直風力");
+      gui
+        .add(params, "friction", 0, 0.1, 0.001)
+        .name("表面摩擦")
+        .onChange((v) => {
+          // 會在生成新雨滴時使用
+        });
+      gui.add(params, "airFriction", 0, 0.1, 0.001).name("空氣阻力");
+      gui.add(params, "spawnRate", 50, 2000, 10).name("生成間隔 (ms)");
+      gui.add(params, "minRadius", 1, 10, 0.5).name("最小半徑");
+      gui.add(params, "maxRadius", 1, 20, 0.5).name("最大半徑");
+
+      /* --------------------------------------------------------------
+   雨滴生成
+----------------------------------------------------------------*/
+      let lastSpawn = 0;
+      function spawnDrop() {
+        const r =
+          Math.random() * (params.maxRadius - params.minRadius) +
+          params.minRadius;
+        const x =
+          Math.random() * (canvas.width - 2 * wallThickness) + wallThickness;
+        const drop = Bodies.circle(x, -r, r, {
+          label: "drop",
+          friction: params.friction,
+          frictionAir: params.airFriction,
+          restitution: 0,
+          render: { fillStyle: "rgba(173,216,230,0.6)" }, // 淺藍半透明
+        });
+        // 讓質量與面積正相關 (density = 0.001)
+        const density = 0.001;
+        Body.setDensity(drop, density);
+        World.add(world, drop);
+      }
+
+      /* --------------------------------------------------------------
+   合併邏輯
+----------------------------------------------------------------*/
+      function mergeDrops(bodyA, bodyB) {
+        // 只合併兩個雨滴
+        if (bodyA.label !== "drop" || bodyB.label !== "drop") return;
+
+        const totalMass = bodyA.mass + bodyB.mass;
+
+        // 位置：質心
+        const newX =
+          (bodyA.position.x * bodyA.mass + bodyB.position.x * bodyB.mass) /
+          totalMass;
+        const newY =
+          (bodyA.position.y * bodyA.mass + bodyB.position.y * bodyB.mass) /
+          totalMass;
+
+        // 半徑：面積相加 (πr²)
+        const newRadius = Math.sqrt(
+          bodyA.circleRadius ** 2 + bodyB.circleRadius ** 2
+        );
+
+        const newDrop = Bodies.circle(newX, newY, newRadius, {
+          label: "drop",
+          friction: params.friction,
+          frictionAir: params.airFriction,
+          restitution: 0,
+          render: { fillStyle: "rgba(173,216,230,0.6)" },
+        });
+        // 設定密度，讓質量正確
+        const density = 0.001;
+        Body.setDensity(newDrop, density);
+
+        // 動量守恆 + 小幅加速（合併後更快滑落）
+        const vx =
+          (bodyA.velocity.x * bodyA.mass + bodyB.velocity.x * bodyB.mass) /
+          totalMass;
+        const vy =
+          ((bodyA.velocity.y * bodyA.mass + bodyB.velocity.y * bodyB.mass) /
+            totalMass) *
+          1.1; // 1.1 讓合併後稍微加速
+        Body.setVelocity(newDrop, { x: vx, y: vy });
+
+        World.add(world, newDrop);
+        World.remove(world, bodyA);
+        World.remove(world, bodyB);
+      }
+
+      /* --------------------------------------------------------------
+   監聽碰撞 → 合併
+----------------------------------------------------------------*/
+      Events.on(engine, "collisionStart", function (event) {
+        const pairs = event.pairs;
+        for (let i = 0; i < pairs.length; i++) {
+          const { bodyA, bodyB } = pairs[i];
+          // 只在兩個雨滴相撞時合併
+          if (bodyA.label === "drop" && bodyB.label === "drop") {
+            mergeDrops(bodyA, bodyB);
+          }
+        }
+      });
+
+      /* --------------------------------------------------------------
+   主循環
+----------------------------------------------------------------*/
+      (function run() {
+        const now = Date.now();
+
+        // 產生雨滴
+        if (now - lastSpawn > params.spawnRate) {
+          spawnDrop();
+          lastSpawn = now;
+        }
+
+        // 施加風力（每一幀對所有雨滴施加一個微小的恆定力）
+        const allDrops = Composite.allBodies(world).filter(
+          (b) => b.label === "drop"
+        );
+        for (let d of allDrops) {
+          Body.applyForce(d, d.position, { x: params.windX, y: params.windY });
+        }
+
+        Engine.update(engine, 1000 / 60); // 固定時間步長
+
+        // 手寫渲染（比 Matter.Render 更輕量且可自訂外觀）
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "rgba(255,255,255,0.03)"; // 微弱的玻璃光澤
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // 畫所有雨滴
+        for (let body of allDrops) {
+          const { x, y } = body.position;
+          const r = body.circleRadius;
+          const grad = ctx.createRadialGradient(x, y, r * 0.2, x, y, r);
+          grad.addColorStop(0, "rgba(255,255,255,0.8)");
+          grad.addColorStop(0.5, "rgba(173,216,230,0.6)");
+          grad.addColorStop(1, "rgba(173,216,230,0.2)");
+          ctx.beginPath();
+          ctx.arc(x, y, r, 0, Math.PI * 2);
+          ctx.fillStyle = grad;
+          ctx.fill();
+        }
+
+        requestAnimationFrame(run);
+      })();
+    </script>
+  </body>
+</html>

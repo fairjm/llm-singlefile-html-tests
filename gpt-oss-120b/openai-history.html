@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <title>OpenAI – 讓 AI 觸手可及的力量</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- 1️⃣ Google Font – 讓文字更有現代感 -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- 2️⃣ Bootstrap 5 (layout + UI) -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-9ndCyUaV0J8RQQV4rMFS2M3F5j6eVx9N5hYdU9E8R3+5T8x6Gk3W8tZr+uBQ0J4"
+      crossorigin="anonymous"
+    />
+
+    <!-- 3️⃣ AOS – Scroll‑triggered animation -->
+    <link href="https://unpkg.com/aos@2.3.4/dist/aos.css" rel="stylesheet" />
+
+    <!-- 4️⃣ Font Awesome – 圖示 -->
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+      rel="stylesheet"
+      integrity="sha384-kFz6M1xI2wKQzG3vG/Uzf+4bV2Wj7dF6vC9JxLzxZy5J5C+F1T5gZ4D9K5E0V5G"
+      crossorigin="anonymous"
+    />
+
+    <!-- 5️⃣ Rellax – 影視差 (parallax) 效果 -->
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/rellax/1.12.2/rellax.min.js"
+      integrity="sha384-9G8n7dD6i2eH/6n2Q9P3V8sA6fZ5uR1p6kA5c4P9Jc+o5G0Jk1X6V4QhR1M9VZ+L"
+      crossorigin="anonymous"
+      defer
+    ></script>
+
+    <style>
+      /* ----- 基本排版 & 玻璃材質 -------- */
+      :root {
+        --primary-01: #0c0c28;
+        --primary-02: #0d0d27;
+        --glass-bg: rgba(255, 255, 255, 0.08);
+        --glass-border: rgba(255, 255, 255, 0.12);
+        --glass-blur: 10px;
+        --font-base: "Inter", system-ui, -apple-system, sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: var(--font-base);
+        color: #fff;
+        background: #111;
+        overflow-x: hidden;
+      }
+
+      /* 背景圖片 + Parallax */
+      #parallax-bg {
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        background: linear-gradient(135deg, #0b0b2c 0%, #1a1a3c 100%);
+        background-attachment: fixed;
+      }
+      .parallax {
+        position: relative;
+        width: 100%;
+        height: 100vh;
+      }
+      .parallax::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: url("https://images.unsplash.com/photo-1517841905240-472988babd04?auto=format&fit=crop&w=2400&q=80")
+          no-repeat center/cover;
+        transform: scale(1.15);
+        filter: blur(4px);
+      }
+
+      /* Hero Section */
+      .hero {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        text-align: center;
+        padding: 2rem;
+      }
+      .hero h1 {
+        font-size: 4rem;
+        font-weight: 700;
+        letter-spacing: 1.5px;
+        background: linear-gradient(45deg, #00e5ff, #a7ff83);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .hero p {
+        max-width: 700px;
+        margin-top: 1rem;
+        line-height: 1.6;
+        font-size: 1.1rem;
+        color: #c0c0d0;
+      }
+
+      /* Glass‑morphism 卡片 */
+      .glass-card {
+        background: var(--glass-bg);
+        border: 1px solid var(--glass-border);
+        border-radius: 1rem;
+        backdrop-filter: blur(var(--glass-blur));
+        -webkit-backdrop-filter: blur(var(--glass-blur));
+        padding: 2rem;
+        transition: transform 0.3s, box-shadow 0.3s;
+      }
+      .glass-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+      }
+
+      /* Section 標題 */
+      .section-title {
+        font-size: 2.2rem;
+        font-weight: 600;
+        text-align: center;
+        margin-bottom: 2rem;
+        position: relative;
+      }
+      .section-title::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        bottom: -0.5rem;
+        transform: translateX(-50%);
+        width: 4rem;
+        height: 2px;
+        background: linear-gradient(90deg, #00e5ff, #a7ff83);
+      }
+
+      /* Footer */
+      footer {
+        text-align: center;
+        padding: 3rem 1rem;
+        font-size: 0.9rem;
+        color: #777;
+      }
+
+      /* 讓內文區域稍微留白，配合玻璃卡片 */
+      .container-xxl {
+        max-width: 1440px;
+        margin: auto;
+      }
+
+      /* 點綴動畫 - AOS delay  */
+      [data-aos] {
+        will-change: transform, opacity;
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- 1️⃣ Parallax 背景 -->
+    <div id="parallax-bg"></div>
+
+    <!-- ==== 2️⃣ HERO ==== -->
+    <section
+      class="hero d-flex flex-column justify-content-center align-items-center text-center"
+    >
+      <h1 data-aos="fade-down" data-aos-delay="120">OpenAI</h1>
+      <p data-aos="fade-up" data-aos-delay="250">
+        以先進的語言模型、圖像模型和決策系統為核心，為全球開發者、企業與創新者提供
+        超越想像的 AI 能力。從 GPT‑4 到 DALL·E、Whisper，OpenAI
+        正在改寫人機互動的方式。
+      </p>
+
+      <a
+        href="#about"
+        class="btn btn-outline-light rounded-pill mt-4"
+        data-aos="zoom-in"
+        data-aos-delay="380"
+        >了解更多</a
+      >
+    </section>
+
+    <!-- ==== 3️⃣ ABOUT ==== -->
+    <section id="about" class="py-5 bg-dark">
+      <div class="container-xxl py-5">
+        <h2 class="section-title" data-aos="fade-up">關於 OpenAI</h2>
+
+        <div class="row gy-4">
+          <div class="col-lg-4" data-aos="fade-right">
+            <div class="glass-card h-100">
+              <i class="fa-solid fa-brain fa-2x text-primary mb-3"></i>
+              <h4>AI 研究領航</h4>
+              <p>
+                OpenAI 以開放與安全的 AI
+                研發為使命，長期投入深度學習、強化學習與多模態技術的前沿探索。
+              </p>
+            </div>
+          </div>
+          <div class="col-lg-4" data-aos="fade-up">
+            <div class="glass-card h-100">
+              <i class="fa-solid fa-robot fa-2x text-primary mb-3"></i>
+              <h4>先進模型平台</h4>
+              <p>
+                從自然語言生成的 GPT 系列，到圖像創作的 DALL·E、語音轉文字的
+                Whisper，提供多元 AI 能力。
+              </p>
+            </div>
+          </div>
+          <div class="col-lg-4" data-aos="fade-left">
+            <div class="glass-card h-100">
+              <i class="fa-solid fa-layer-group fa-2x text-primary mb-3"></i>
+              <h4>開放 API</h4>
+              <p>
+                開發者可透過簡潔、可擴展的 API
+                直接將模型嵌入應用、服務與產品，降低 AI 部署成本。
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==== 4️⃣ MODEL SHOWCASE ==== -->
+    <section
+      class="py-5"
+      style="background: linear-gradient(135deg, #111 0%, #1a1a3c 100%)"
+    >
+      <div class="container-xxl py-5">
+        <h2 class="section-title" data-aos="fade-up">核心模型概覽</h2>
+
+        <div class="row g-4">
+          <!-- GPT-4 -->
+          <div class="col-md-6 col-lg-4" data-aos="flip-left">
+            <div class="glass-card">
+              <h4 class="text-primary mb-2">GPT‑4</h4>
+              <p>
+                最新的通用語言模型，擁有更強的推理與指令遵守能力，支援多語言與長篇文本生成。
+              </p>
+              <ul class="list-unstyled">
+                <li>
+                  <i class="fa-solid fa-check-circle text-success me-1"></i>
+                  超過 1 兆參數
+                </li>
+                <li>
+                  <i class="fa-solid fa-check-circle text-success me-1"></i>
+                  多模態 (文字+圖像)
+                </li>
+                <li>
+                  <i class="fa-solid fa-check-circle text-success me-1"></i>
+                  更低誤導率
+                </li>
+              </ul>
+            </div>
+          </div>
+          <!-- DALL·E -->
+          <div class="col-md-6 col-lg-4" data-aos="flip-up">
+            <div class="glass-card">
+              <h4 class="text-primary mb-2">DALL·E 3</h4>
+              <p>
+                根據文字敘述產生高解析度、寫實感十足的圖像，兼具創意與控制性。
+              </p>
+              <ul class="list-unstyled">
+                <li>
+                  <i class="fa-solid fa-check-circle text-success me-1"></i>
+                  1024×1024 超高畫質
+                </li>
+                <li>
+                  <i class="fa-solid fa-check-circle text-success me-1"></i>
+                  精準語意對齊
+                </li>
+                <li>
+                  <i class="fa-solid fa-check-circle text-success me-1"></i>
+                  支援風格指令
+                </li>
+              </ul>
+            </div>
+          </div>
+          <!-- Whisper -->
+          <div class="col-md-6 col-lg-4" data-aos="flip-right">
+            <div class="glass-card">
+              <h4 class="text-primary mb-2">Whisper</h4>
+              <p>
+                自動語音辨識與翻譯模型，支援 99 種語言的即時文字轉錄與翻譯。
+              </p>
+              <ul class="list-unstyled">
+                <li>
+                  <i class="fa-solid fa-check-circle text-success me-1"></i>
+                  多語種高精度
+                </li>
+                <li>
+                  <i class="fa-solid fa-check-circle text-success me-1"></i>
+                  端到端語音流處理
+                </li>
+                <li>
+                  <i class="fa-solid fa-check-circle text-success me-1"></i>
+                  零稿字或噪音容錯
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==== 5️⃣ USE CASES ==== -->
+    <section class="py-5 bg-dark">
+      <div class="container-xxl py-5">
+        <h2 class="section-title" data-aos="fade-up">產業應用案例</h2>
+
+        <div class="row gy-4">
+          <div class="col-lg-6" data-aos="fade-right">
+            <div class="glass-card d-flex align-items-center gap-4">
+              <i class="fa-solid fa-laptop-code fa-3x text-primary"></i>
+              <div>
+                <h5 class="mb-1">智慧客服與助理</h5>
+                <p class="mb-0">
+                  利用 GPT‑4 生成自然語言回覆，縮短回應時間，提高客戶滿意度。
+                </p>
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-6" data-aos="fade-left">
+            <div class="glass-card d-flex align-items-center gap-4">
+              <i class="fa-solid fa-paintbrush-fine-art fa-3x text-primary"></i>
+              <div>
+                <h5 class="mb-1">創意設計與內容生成</h5>
+                <p class="mb-0">
+                  DALL·E 讓設計師以文字構思即時生成概念圖，從原型快速迭代。
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-6" data-aos="fade-up">
+            <div class="glass-card d-flex align-items-center gap-4">
+              <i class="fa-solid fa-microphone-lines fa-3x text-primary"></i>
+              <div>
+                <h5 class="mb-1">多語音會議即時字幕</h5>
+                <p class="mb-0">
+                  Whisper 將多語言語音即時轉寫，支援跨國會議與無障礙溝通。
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-6" data-aos="fade-up">
+            <div class="glass-card d-flex align-items-center gap-4">
+              <i class="fa-solid fa-chart-line fa-3x text-primary"></i>
+              <div>
+                <h5 class="mb-1">數據分析與報告自動化</h5>
+                <p class="mb-0">
+                  結合 LLM 與商業資訊，生成結構化報告與洞察，提升決策速度。
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==== 6️⃣ CTA & FOOTER ==== -->
+    <section
+      class="text-center py-5"
+      style="background: linear-gradient(45deg, #0d0d27, #01012b)"
+    >
+      <div class="container-xxl">
+        <h2 class="section-title" data-aos="fade-down">開始使用 OpenAI API</h2>
+        <p class="mb-4" data-aos="fade-up">
+          註冊、獲取 API 金鑰，立即把 AI 能力嵌入您的產品或服務內。<br />
+          無需自行訓練模型，專注於業務和創新。
+        </p>
+        <a
+          href="https://platform.openai.com/account/api-keys"
+          class="btn btn-primary btn-lg rounded-pill"
+          data-aos="zoom-in"
+          target="_blank"
+          >前往 OpenAI 平台</a
+        >
+      </div>
+    </section>
+
+    <footer>© 2024 OpenAI | All rights reserved | 本網站僅作技術展示</footer>
+
+    <!-- ====== JS ====== -->
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-kenU1KFdBIbI8M3eQFhY4Z7QkP5p3iF6nVj3q5U5K0jK3h5f5E7b8c6Z9e3n0v1G"
+      crossorigin="anonymous"
+    ></script>
+
+    <script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script>
+
+    <script>
+      // AOS 初始化
+      AOS.init({
+        once: true,
+        duration: 800,
+        easing: "ease-out-cubic",
+      });
+
+      // Rellax (簡單的視差效果) – 只對 #parallax-bg 裡的背景層做輕微移動
+      const rellax = new Rellax("#parallax-bg", {
+        speed: -2,
+        center: true,
+      });
+    </script>
+  </body>
+</html>

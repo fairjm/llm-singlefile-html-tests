@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Typing Demo Textarea</title>
+    <!-- Google Fonts -->
+    <link
+      href="https://fonts.googleapis.com/css2?familyFira+Code:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <!-- anime.js (仅用于光标闪烁，可不使用) -->
+    <script src="https://cdn.jsdelivr.net/npm/animejs@3.2.1/lib/anime.min.js"></script>
+    <style>
+      body {
+        background: #f0f4f8;
+        font-family: "Fira Code", monospace;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        margin: 0;
+      }
+      .typing-box {
+        width: 500px;
+        height: 200px;
+        padding: 1rem;
+        border: none;
+        border-radius: 12px;
+        background: #fff;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        resize: none;
+        font-size: 1rem;
+        line-height: 1.5;
+        color: #333;
+        outline: none;
+        transition: transform 0.2s, box-shadow 0.2s;
+        overflow: auto;
+        position: relative;
+      }
+      .typing-box:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 12px 20px rgba(0, 0, 0, 0.15);
+      }
+      /* 光标 */
+      .cursor {
+        display: inline-block;
+        width: 2px;
+        background: #333;
+        animation: blink 1s steps(2, start) infinite;
+        vertical-align: bottom;
+        margin-left: 2px;
+      }
+      @keyframes blink {
+        0% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0;
+        }
+        100% {
+          opacity: 1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <textarea class="typing-box" id="typingBox" readonly></textarea>
+
+    <script>
+      // ----------置 ----------
+      const SENTENCES = [
+        "雨后的城市街道，灯火阑珊，行人匆匆。",
+        "在星空下，时间似乎停止了呼吸。",
+        "代码如同音乐，每一次敲击都在谱写未来。",
+        "春风十里，不如你一次温柔的微笑。",
+        "深海的沉默，让人听见自己的心跳。",
+        "咖啡的苦涩与甘甜，恰似人生的起伏。",
+        "每一次输出，都在为世界留下痕迹。",
+      ];
+      const MIN_CHAR_DELAY = 50; // 单字符最小延迟（ms）
+      const MAX_CHAR_DELAY = 200; // 单字符最大延迟（ms）
+      const PAUSE_BETWEEN_SENTENCES = 1500; // 两段文字之间的停顿
+
+      // ---------- 主逻辑 ----------
+      const textarea = document.getElementById("typingBox");
+      let cursorSpan = null;
+
+      /**
+       * 在 textarea 末尾添加光标 DOM（用于闪烁效果），
+       * 由于 textarea 本身不支持子元素，这里采用 hack：
+       * 把光标放在 textarea 的值里（Unicode 零宽空格 + <span>）。
+       * 为了保持可复制，这里我们直接在值后插入 “|” 并用 CSS 隐藏。
+       */
+      function showCursor() {
+        // 用 "|" 充当光标，随后用 CSS 让它闪烁
+        textarea.value += "|";
+      }
+
+      /**
+       * 移除光标字符（如果存在）
+       */
+      function hideCursor() {
+        if (textarea.value.endsWith("|")) {
+          textarea.value = textarea.value.slice(0, -1);
+        }
+      }
+
+      /**
+       * 随机返回 0~max 的整数
+       */
+      function randInt(max) {
+        return Math.floor(Math.random() * max);
+      }
+
+      /**
+       * 输入一段文字（逐字）
+       */
+      function typeSentence(sentence, callback) {
+        let i = 0;
+        function typeChar() {
+          hideCursor();
+          if (i < sentence.length) {
+            textarea.value += sentence[i];
+            i++;
+            showCursor();
+            const delay =
+              MIN_CHAR_DELAY + randInt(MAX_CHAR_DELAY - MIN_CHAR_DELAY);
+            setTimeout(typeChar, delay);
+          } else {
+            // 完成本句，隐藏光标后回调
+            hideCursor();
+            if (typeof callback === "function") callback();
+          }
+        }
+        typeChar();
+      }
+
+      /**
+       * 主流程：循环随机选取几段文字并打字
+       */
+      function startTyping() {
+        let usedIdx = new Set();
+        function next() {
+          // 随机挑一段未使用的（若全部使用完则重置）
+          if (usedIdx.size === SENTENCES.length) usedIdx.clear();
+          let idx;
+          do {
+            idx = randInt(SENTENCES.length);
+          } while (usedIdx.has(idx));
+          usedIdx.add(idx);
+          const sentence = SENTENCES[idx];
+
+          typeSentence(sentence, () => {
+            // 打完一句后换行并暂停
+            textarea.value += "\n";
+            setTimeout(next, PAUSE_BETWEEN_SENTENCES);
+          });
+        }
+        next();
+      }
+
+      // ---------- 启动 ----------
+      startTyping();
+
+      // ---------- 让光标在页面失去焦点时仍然闪烁 ----------
+      textarea.addEventListener("blur", () => {
+        // 保持光标闪烁
+        showCursor();
+      });
+      textarea.addEventListener("focus", () => {
+        hideCursor();
+      });
+    </script>
+  </body>
+</html>

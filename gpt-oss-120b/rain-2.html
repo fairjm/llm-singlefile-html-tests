@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <title>雨滴在玻璃上滑落 – 帶拖尾效果（已修正）</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: #111;
+      }
+      #canvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+
+    <!-- Matter.js – 2D 物理引擎 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <!-- dat.GUI – 即時參數調整介面 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.7/dat.gui.min.js"></script>
+
+    <script>
+      /* ==============================================================
+   1️⃣ 先把 Matter.js 需要的類別解構出來（一定要最先執行）
+================================================================*/
+      const { Engine, World, Bodies, Body, Events, Composite } = Matter;
+
+      /* ==============================================================
+   2️⃣ 基本畫布設定
+================================================================*/
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+
+      function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // 更新牆體座標（在牆體建立之後才會有 walls 變數）
+        if (typeof walls !== "undefined") {
+          Body.setPosition(walls[0], {
+            x: -wallThickness / 2,
+            y: canvas.height / 2,
+          });
+          Body.setPosition(walls[1], {
+            x: canvas.width + wallThickness / 2,
+            y: canvas.height / 2,
+          });
+          Body.setPosition(walls[2], {
+            x: canvas.width / 2,
+            y: canvas.height + wallThickness / 2,
+          });
+        }
+      }
+      window.addEventListener("resize", resize);
+
+      /* ==============================================================
+   3️⃣ 物理世界 (Engine / World) 與牆體
+================================================================*/
+      const engine = Engine.create();
+      const world = engine.world;
+      world.gravity.y = 1; // 之後會由 GUI 控制
+      world.gravity.scale = 0.001; // 調整速度的尺度
+
+      const wallThickness = 80; // 玻璃四周的「牆」厚度
+      const walls = [
+        // 左牆
+        Bodies.rectangle(
+          -wallThickness / 2,
+          canvas.height / 2,
+          wallThickness,
+          canvas.height,
+          { isStatic: true }
+        ),
+        // 右牆
+        Bodies.rectangle(
+          canvas.width + wallThickness / 2,
+          canvas.height / 2,
+          wallThickness,
+          canvas.height,
+          { isStatic: true }
+        ),
+        // 底牆（防止雨滴掉出畫面）
+        Bodies.rectangle(
+          canvas.width / 2,
+          canvas.height + wallThickness / 2,
+          canvas.width,
+          wallThickness,
+          { isStatic: true }
+        ),
+      ];
+      World.add(world, walls);
+
+      /* 先呼叫一次 resize，確保 canvas 大小正確且牆體座標已更新 */
+      resize();
+
+      /* ==============================================================
+   4️⃣ GUI 參數
+================================================================*/
+      const params = {
+        gravity: 1, // 垂直重力
+        windX: 0, // 水平風力
+        windY: 0, // 垂直風力（可正可負）
+        friction: 0.02, // 玻璃表面摩擦
+        airFriction: 0.02, // 空氣阻力
+        spawnRate: 300, // 雨滴產生間隔（ms）
+        minRadius: 2,
+        maxRadius: 5,
+        trailLength: 12, // 每個雨滴的拖尾幀數（越大拖尾越長）
+        trailFade: 0.04, // 玻璃淡出速度（越小拖尾越持久）
+      };
+
+      const gui = new dat.GUI({ width: 310 });
+      gui
+        .add(params, "gravity", 0, 2, 0.01)
+        .name("垂直重力")
+        .onChange((v) => (world.gravity.y = v));
+      gui.add(params, "windX", -0.001, 0.001, 0.00001).name("水平風力");
+      gui.add(params, "windY", -0.001, 0.001, 0.00001).name("垂直風力");
+      gui.add(params, "friction", 0, 0.1, 0.001).name("表面摩擦");
+      gui.add(params, "airFriction", 0, 0.1, 0.001).name("空氣阻力");
+      gui.add(params, "spawnRate", 50, 2000, 10).name("生成間隔 (ms)");
+      gui.add(params, "minRadius", 1, 10, 0.5).name("最小半徑");
+      gui.add(params, "maxRadius", 1, 20, 0.5).name("最大半徑");
+      gui.add(params, "trailLength", 4, 30, 1).name("拖尾長度");
+      gui.add(params, "trailFade", 0.01, 0.2, 0.01).name("玻璃淡出");
+
+      /* ==============================================================
+   5️⃣ 雨滴產生
+================================================================*/
+      function spawnDrop() {
+        const r =
+          Math.random() * (params.maxRadius - params.minRadius) +
+          params.minRadius;
+        const x =
+          Math.random() * (canvas.width - 2 * wallThickness) + wallThickness;
+        const drop = Bodies.circle(x, -r, r, {
+          label: "drop",
+          friction: params.friction,
+          frictionAir: params.airFriction,
+          restitution: 0,
+          render: { fillStyle: "rgba(173,216,230,0.6)" },
+        });
+        // 密度決定質量（mass = area * density）
+        Body.setDensity(drop, 0.001);
+        // 用一個陣列保存歷史座標，稍後渲染成拖尾
+        drop.trail = [];
+        World.add(world, drop);
+      }
+
+      /* ==============================================================
+   6️⃣ 合併邏輯（保留拖尾）
+================================================================*/
+      function mergeDrops(bodyA, bodyB) {
+        if (bodyA.label !== "drop" || bodyB.label !== "drop") return;
+
+        const totalMass = bodyA.mass + bodyB.mass;
+        const newX =
+          (bodyA.position.x * bodyA.mass + bodyB.position.x * bodyB.mass) /
+          totalMass;
+        const newY =
+          (bodyA.position.y * bodyA.mass + bodyB.position.y * bodyB.mass) /
+          totalMass;
+        // 面積相加 → 半徑 (πr²)
+        const newRadius = Math.sqrt(
+          bodyA.circleRadius ** 2 + bodyB.circleRadius ** 2
+        );
+
+        const newDrop = Bodies.circle(newX, newY, newRadius, {
+          label: "drop",
+          friction: params.friction,
+          frictionAir: params.airFriction,
+          restitution: 0,
+          render: { fillStyle: "rgba(173,216,230,0.6)" },
+        });
+        Body.setDensity(newDrop, 0.001);
+
+        // 動量守恆 + 小幅加速（讓合併後的雨滴更快滑下）
+        const vx =
+          (bodyA.velocity.x * bodyA.mass + bodyB.velocity.x * bodyB.mass) /
+          totalMass;
+        const vy =
+          ((bodyA.velocity.y * bodyA.mass + bodyB.velocity.y * bodyB.mass) /
+            totalMass) *
+          1.12;
+        Body.setVelocity(newDrop, { x: vx, y: vy });
+
+        // 合併兩個雨滴的拖尾（保留最近的 N 個）
+        const mergedTrail = bodyA.trail
+          .concat(bodyB.trail)
+          .slice(-params.trailLength);
+        newDrop.trail = mergedTrail;
+
+        World.add(world, newDrop);
+        World.remove(world, bodyA);
+        World.remove(world, bodyB);
+      }
+
+      /* ==============================================================
+   7️⃣ 監聽碰撞 → 合併
+================================================================*/
+      Events.on(engine, "collisionStart", (event) => {
+        const pairs = event.pairs;
+        for (let i = 0; i < pairs.length; i++) {
+          const { bodyA, bodyB } = pairs[i];
+          if (bodyA.label === "drop" && bodyB.label === "drop") {
+            mergeDrops(bodyA, bodyB);
+          }
+        }
+      });
+
+      /* ==============================================================
+   8️⃣ 主循環
+================================================================*/
+      let lastSpawn = 0;
+      function loop() {
+        const now = Date.now();
+
+        // ---- 產生雨滴 ----
+        if (now - lastSpawn > params.spawnRate) {
+          spawnDrop();
+          lastSpawn = now;
+        }
+
+        // ---- 施加風力（每幀對所有雨滴施加恆定微小力量）----
+        const drops = Composite.allBodies(world).filter(
+          (b) => b.label === "drop"
+        );
+        for (const d of drops) {
+          Body.applyForce(d, d.position, { x: params.windX, y: params.windY });
+        }
+
+        // ---- 更新物理引擎 ----
+        Engine.update(engine, 1000 / 60);
+
+        // ---- 玻璃淡出（產生拖尾的基礎）----
+        ctx.fillStyle = `rgba(255,255,255,${params.trailFade})`; // 越小拖尾越持久
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // ---- 渲染雨滴 & 拖尾 ----
+        for (const body of drops) {
+          const { x, y } = body.position;
+          const r = body.circleRadius;
+
+          // 1. 把當前座標加入 trail（限制長度）
+          if (!body.trail) body.trail = [];
+          body.trail.push({ x, y });
+          if (body.trail.length > params.trailLength) body.trail.shift();
+
+          // 2. 先畫 trail（舊 → 新，透明度逐漸增強）
+          for (let i = 0; i < body.trail.length; i++) {
+            const pt = body.trail[i];
+            const age = i / body.trail.length; // 0（舊）~1（新）
+            const alpha = age * 0.6; // 透明度
+            const radius = r * age * 0.8 + 0.3; // 漸小
+            const grad = ctx.createRadialGradient(
+              pt.x,
+              pt.y,
+              radius * 0.2,
+              pt.x,
+              pt.y,
+              radius
+            );
+            grad.addColorStop(0, `rgba(255,255,255,${alpha})`);
+            grad.addColorStop(0.5, `rgba(173,216,230,${alpha * 0.6})`);
+            grad.addColorStop(1, `rgba(173,216,230,0)`);
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y, radius, 0, Math.PI * 2);
+            ctx.fillStyle = grad;
+            ctx.fill();
+          }
+
+          // 3. 再畫雨滴本身（位於最前端）
+          const grad = ctx.createRadialGradient(x, y, r * 0.2, x, y, r);
+          grad.addColorStop(0, "rgba(255,255,255,0.9)");
+          grad.addColorStop(0.5, "rgba(173,216,230,0.7)");
+          grad.addColorStop(1, "rgba(173,216,230,0.2)");
+          ctx.beginPath();
+          ctx.arc(x, y, r, 0, Math.PI * 2);
+          ctx.fillStyle = grad;
+          ctx.fill();
+        }
+
+        requestAnimationFrame(loop);
+      }
+      requestAnimationFrame(loop);
+    </script>
+  </body>
+</html>
