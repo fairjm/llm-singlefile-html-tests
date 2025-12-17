@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>打字动画组件 - Typing Component</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+
+      .container {
+        max-width: 800px;
+        width: 100%;
+      }
+
+      .title {
+        text-align: center;
+        color: white;
+        font-size: 32px;
+        font-weight: 700;
+        margin-bottom: 16px;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      }
+
+      .subtitle {
+        text-align: center;
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 16px;
+        margin-bottom: 32px;
+      }
+
+      .typing-container {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .typing-container::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, #667eea, #764ba2);
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+
+      .typing-container:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+      }
+
+      .typing-container:hover::before {
+        opacity: 1;
+      }
+
+      .typing-container.typing {
+        box-shadow: 0 12px 40px rgba(102, 126, 234, 0.4);
+      }
+
+      .typing-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #e5e7eb;
+      }
+
+      .window-dots {
+        display: flex;
+        gap: 6px;
+      }
+
+      .dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #e5e7eb;
+        transition: background 0.3s;
+      }
+
+      .typing-container.typing .dot {
+        background: #667eea;
+        animation: pulse 1.5s infinite;
+      }
+
+      .typing-container.typing .dot:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+
+      .typing-container.typing .dot:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 0.4;
+        }
+        50% {
+          opacity: 1;
+        }
+      }
+
+      .header-title {
+        font-size: 14px;
+        color: #6b7280;
+        font-weight: 500;
+        margin-left: 8px;
+      }
+
+      .typing-status {
+        margin-left: auto;
+        font-size: 12px;
+        padding: 4px 8px;
+        border-radius: 4px;
+        background: #f3f4f6;
+        color: #6b7280;
+        font-weight: 500;
+        transition: all 0.3s;
+      }
+
+      .typing-container.typing .typing-status {
+        background: #dbeafe;
+        color: #3b82f6;
+        animation: blink 1s infinite;
+      }
+
+      @keyframes blink {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+
+      .typing-area {
+        width: 100%;
+        min-height: 200px;
+        max-height: 400px;
+        overflow-y: auto;
+        padding: 16px;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        background: #f9fafb;
+        font-family: "Consolas", "Monaco", "Courier New", monospace;
+        font-size: 15px;
+        line-height: 1.6;
+        color: #1f2937;
+        transition: all 0.3s;
+        resize: none;
+        outline: none;
+        position: relative;
+      }
+
+      .typing-area:focus {
+        border-color: #667eea;
+        background: white;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      }
+
+      .typing-area::selection {
+        background: rgba(102, 126, 234, 0.2);
+      }
+
+      .cursor {
+        display: inline-block;
+        width: 2px;
+        height: 1.2em;
+        background: #667eea;
+        margin-left: 2px;
+        vertical-align: text-bottom;
+        animation: blink-cursor 1s infinite;
+      }
+
+      @keyframes blink-cursor {
+        0%,
+        49% {
+          opacity: 1;
+        }
+        50%,
+        100% {
+          opacity: 0;
+        }
+      }
+
+      .controls {
+        display: flex;
+        gap: 12px;
+        margin-top: 20px;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+      }
+
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      }
+
+      .btn-primary:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .btn-secondary {
+        background: #f3f4f6;
+        color: #374151;
+      }
+
+      .btn-secondary:hover {
+        background: #e5e7eb;
+        transform: translateY(-2px);
+      }
+
+      .btn-danger {
+        background: #ef4444;
+        color: white;
+      }
+
+      .btn-danger:hover {
+        background: #dc2626;
+        transform: translateY(-2px);
+      }
+
+      .btn-copy {
+        background: #10b981;
+        color: white;
+      }
+
+      .btn-copy:hover {
+        background: #059669;
+        transform: translateY(-2px);
+      }
+
+      .text-options {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+        flex-wrap: wrap;
+      }
+
+      .option-btn {
+        padding: 6px 12px;
+        border: 1px solid #d1d5db;
+        background: white;
+        border-radius: 6px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+        color: #374151;
+      }
+
+      .option-btn:hover {
+        background: #f3f4f6;
+        border-color: #667eea;
+        color: #667eea;
+      }
+
+      .stats {
+        display: flex;
+        gap: 16px;
+        margin-top: 12px;
+        font-size: 13px;
+        color: #6b7280;
+      }
+
+      .stat-item {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .stat-value {
+        font-weight: 600;
+        color: #374151;
+      }
+
+      .toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #10b981;
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-weight: 500;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        transform: translateX(400px);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 1000;
+      }
+
+      .toast.show {
+        transform: translateX(0);
+      }
+
+      .toast.error {
+        background: #ef4444;
+      }
+
+      /* Scrollbar styling */
+      .typing-area::-webkit-scrollbar {
+        width: 8px;
+      }
+
+      .typing-area::-webkit-scrollbar-track {
+        background: #f3f4f6;
+        border-radius: 4px;
+      }
+
+      .typing-area::-webkit-scrollbar-thumb {
+        background: #d1d5db;
+        border-radius: 4px;
+      }
+
+      .typing-area::-webkit-scrollbar-thumb:hover {
+        background: #9ca3af;
+      }
+
+      /* Responsive */
+      @media (max-width: 640px) {
+        .title {
+          font-size: 24px;
+        }
+
+        .controls {
+          flex-direction: column;
+        }
+
+        .btn {
+          width: 100%;
+          justify-content: center;
+        }
+
+        .typing-area {
+          min-height: 150px;
+          font-size: 14px;
+        }
+      }
+
+      /* Copy indicator */
+      .copy-indicator {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        background: rgba(16, 185, 129, 0.9);
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        opacity: 0;
+        transform: translateY(-4px);
+        transition: all 0.3s;
+        pointer-events: none;
+      }
+
+      .copy-indicator.show {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1 class="title">⌨️ 打字动画组件</h1>
+      <p class="subtitle">模拟真实用户输入，支持随机延时和复制功能</p>
+
+      <div class="typing-container" id="typingContainer">
+        <div class="typing-header">
+          <div class="window-dots">
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+          </div>
+          <div class="header-title">终端 - 输入模式</div>
+          <div class="typing-status" id="typingStatus">就绪</div>
+          <div class="copy-indicator" id="copyIndicator">已复制!</div>
+        </div>
+
+        <div class="typing-area" id="typingArea" tabindex="0"></div>
+
+        <div class="stats">
+          <div class="stat-item">
+            <span>字符数:</span>
+            <span class="stat-value" id="charCount">0</span>
+          </div>
+          <div class="stat-item">
+            <span>耗时:</span>
+            <span class="stat-value" id="timeElapsed">0s</span>
+          </div>
+          <div class="stat-item">
+            <span>速度:</span>
+            <span class="stat-value" id="typingSpeed">0</span>
+            <span>字符/秒</span>
+          </div>
+        </div>
+
+        <div class="controls">
+          <button class="btn btn-primary" id="startBtn">
+            <span>▶️</span>
+            <span>开始打字</span>
+          </button>
+          <button class="btn btn-secondary" id="pauseBtn" disabled>
+            <span>⏸️</span>
+            <span>暂停</span>
+          </button>
+          <button class="btn btn-danger" id="stopBtn" disabled>
+            <span>⏹️</span>
+            <span>停止</span>
+          </button>
+          <button class="btn btn-copy" id="copyBtn">
+            <span>📋</span>
+            <span>复制内容</span>
+          </button>
+        </div>
+
+        <div class="text-options">
+          <button class="option-btn" data-text="code">代码示例</button>
+          <button class="option-btn" data-text="poem">古诗词</button>
+          <button class="option-btn" data-text="tech">技术文章</button>
+          <button class="option-btn" data-text="story">小故事</button>
+          <button class="option-btn" data-text="random">随机文本</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+      // 预定义文本内容
+      const texts = {
+        code: `function fibonacci(n) {
+    if (n <= 1) return n;
+    let a = 0, b = 1;
+    for (let i = 2; i <= n; i++) {
+        let temp = a + b;
+        a = b;
+        b = temp;
+    }
+    return b;
+}
+
+// 计算第10个斐波那契数
+const result = fibonacci(10);
+console.log("结果:", result);`,
+
+        poem: `静夜思
+床前明月光，
+疑是地上霜。
+举头望明月，
+低头思故乡。
+
+春江花月夜
+春江潮水连海平，
+海上明月共潮生。
+滟滟随波千万里，
+何处春江无月明！`,
+
+        tech: `现代前端开发的核心理念是组件化和模块化。通过将UI拆分为独立的、可复用的组件，我们可以更好地管理复杂性。
+
+React、Vue等框架提供了强大的状态管理机制，使得数据流更加清晰。同时，TypeScript的引入为JavaScript添加了静态类型检查，大大提高了代码的可靠性和可维护性。
+
+在构建大型应用时，我们还需要考虑性能优化、代码分割、懒加载等策略，以确保用户体验的流畅性。`,
+
+        story: `在一个宁静的小镇上，住着一位名叫小明的程序员。他每天都会在清晨的阳光中开始一天的工作。
+
+有一天，他决定写一个有趣的打字动画组件。这个想法源于他观察到用户在输入时的那种专注感，仿佛每一个字符都承载着思考的重量。
+
+经过几天的努力，他终于完成了这个组件。它不仅能模拟真实的打字效果，还能根据不同的场景切换文本内容。最让他自豪的是，这个组件完全使用原生JavaScript实现，没有任何依赖。
+
+当他把这个组件分享给朋友们时，大家都被它的精致和实用性所打动。这让他意识到，有时候最简单的技术反而能创造出最美好的体验。`,
+
+        random: `在数字时代，我们每天都在与代码和数据打交道。每一行代码都像是一个小小的承诺，承载着开发者的智慧和努力。
+
+优秀的软件不仅仅是功能的堆砌，更是对用户体验的深度思考。它应该像一位贴心的助手，在你需要的时候恰到好处地出现，在你不需要的时候安静地等待。
+
+技术的进步永无止境，但我们始终要记住，技术的本质是为人类服务的。让我们用代码创造更美好的世界！`,
+      };
+
+      class TypingAnimation {
+        constructor() {
+          this.isTyping = false;
+          this.isPaused = false;
+          this.currentText = "";
+          this.currentIndex = 0;
+          this.currentTextName = "";
+          this.startTime = null;
+          this.pauseTime = 0;
+          this.totalPauseTime = 0;
+          this.animationId = null;
+
+          this.elements = {
+            container: document.getElementById("typingContainer"),
+            area: document.getElementById("typingArea"),
+            status: document.getElementById("typingStatus"),
+            startBtn: document.getElementById("startBtn"),
+            pauseBtn: document.getElementById("pauseBtn"),
+            stopBtn: document.getElementById("stopBtn"),
+            copyBtn: document.getElementById("copyBtn"),
+            charCount: document.getElementById("charCount"),
+            timeElapsed: document.getElementById("timeElapsed"),
+            typingSpeed: document.getElementById("typingSpeed"),
+            toast: document.getElementById("toast"),
+            copyIndicator: document.getElementById("copyIndicator"),
+          };
+
+          this.init();
+        }
+
+        init() {
+          this.setupEventListeners();
+          this.updateStats();
+        }
+
+        setupEventListeners() {
+          // 控制按钮
+          this.elements.startBtn.addEventListener("click", () => this.start());
+          this.elements.pauseBtn.addEventListener("click", () => this.pause());
+          this.elements.stopBtn.addEventListener("click", () => this.stop());
+          this.elements.copyBtn.addEventListener("click", () =>
+            this.copyContent()
+          );
+
+          // 文本选项按钮
+          document.querySelectorAll(".option-btn").forEach((btn) => {
+            btn.addEventListener("click", (e) => {
+              const textType = e.target.dataset.text;
+              this.selectText(textType);
+            });
+          });
+
+          // 键盘快捷键
+          this.elements.area.addEventListener("keydown", (e) => {
+            if (e.ctrlKey && e.key === "c") {
+              e.preventDefault();
+              this.copyContent();
+            }
+          });
+
+          // 点击容器复制
+          this.elements.area.addEventListener("click", () => {
+            if (!this.isTyping && this.currentText) {
+              this.copyContent();
+            }
+          });
+        }
+
+        selectText(type) {
+          if (this.isTyping) {
+            this.showToast("请先停止当前打字任务", "error");
+            return;
+          }
+
+          if (type === "random") {
+            const keys = Object.keys(texts);
+            const randomKey = keys[Math.floor(Math.random() * keys.length)];
+            this.currentText = texts[randomKey];
+            this.currentTextName = randomKey;
+          } else {
+            this.currentText = texts[type];
+            this.currentTextName = type;
+          }
+
+          this.elements.area.textContent = "";
+          this.currentIndex = 0;
+          this.updateStats();
+          this.showToast(`已选择: ${this.getTextName(type)}`, "success");
+        }
+
+        getTextName(type) {
+          const names = {
+            code: "代码示例",
+            poem: "古诗词",
+            tech: "技术文章",
+            story: "小故事",
+            random: "随机文本",
+          };
+          return names[type] || type;
+        }
+
+        start() {
+          if (!this.currentText) {
+            this.showToast("请先选择文本类型", "error");
+            return;
+          }
+
+          if (this.isTyping && !this.isPaused) {
+            return;
+          }
+
+          if (this.isPaused) {
+            // 恢复打字
+            this.isPaused = false;
+            this.totalPauseTime += Date.now() - this.pauseTime;
+            this.continueTyping();
+            this.updateUIState("typing");
+            return;
+          }
+
+          // 开始新的打字任务
+          this.isTyping = true;
+          this.isPaused = false;
+          this.currentIndex = 0;
+          this.startTime = Date.now();
+          this.totalPauseTime = 0;
+          this.elements.area.textContent = "";
+
+          this.updateUIState("typing");
+          this.typeNextChar();
+        }
+
+        pause() {
+          if (!this.isTyping || this.isPaused) return;
+
+          this.isPaused = true;
+          this.pauseTime = Date.now();
+
+          if (this.animationId) {
+            clearTimeout(this.animationId);
+            this.animationId = null;
+          }
+
+          this.updateUIState("paused");
+        }
+
+        stop() {
+          this.isTyping = false;
+          this.isPaused = false;
+          this.currentIndex = 0;
+          this.startTime = null;
+          this.pauseTime = 0;
+          this.totalPauseTime = 0;
+
+          if (this.animationId) {
+            clearTimeout(this.animationId);
+            this.animationId = null;
+          }
+
+          this.elements.area.textContent = this.currentText || "";
+          this.updateUIState("stopped");
+          this.updateStats();
+        }
+
+        typeNextChar() {
+          if (!this.isTyping || this.isPaused) return;
+
+          if (this.currentIndex >= this.currentText.length) {
+            this.finishTyping();
+            return;
+          }
+
+          const char = this.currentText[this.currentIndex];
+
+          // 添加字符到显示区域
+          const span = document.createElement("span");
+          span.textContent = char;
+          this.elements.area.appendChild(span);
+
+          // 添加光标
+          this.addCursor();
+
+          // 滚动到底部
+          this.elements.area.scrollTop = this.elements.area.scrollHeight;
+
+          this.currentIndex++;
+          this.updateStats();
+
+          // 计算随机延时
+          const delay = this.getRandomDelay(char);
+
+          this.animationId = setTimeout(() => {
+            // 移除旧光标
+            const oldCursor = this.elements.area.querySelector(".cursor");
+            if (oldCursor) oldCursor.remove();
+
+            this.typeNextChar();
+          }, delay);
+        }
+
+        getRandomDelay(char) {
+          // 基础延时
+          let baseDelay = 80;
+
+          // 根据字符类型调整
+          if (char === " ") {
+            baseDelay = 120; // 空格稍慢
+          } else if (char === "\n") {
+            baseDelay = 200; // 换行更慢
+          } else if (/[.,;:!?]/.test(char)) {
+            baseDelay = 150; // 标点符号
+          } else if (/[a-zA-Z]/.test(char)) {
+            baseDelay = 60; // 英文字符较快
+          } else if (/[\u4e00-\u9fa5]/.test(char)) {
+            baseDelay = 100; // 中文字符
+          }
+
+          // 随机波动 ±40%
+          const variance = baseDelay * 0.4;
+          const random = (Math.random() - 0.5) * 2 * variance;
+
+          // 偶尔的长停顿（模拟思考）
+          const longPause = Math.random() < 0.05 ? 500 : 0;
+
+          return Math.max(30, baseDelay + random + longPause);
+        }
+
+        addCursor() {
+          const cursor = document.createElement("span");
+          cursor.className = "cursor";
+          this.elements.area.appendChild(cursor);
+        }
+
+        finishTyping() {
+          this.isTyping = false;
+          this.isPaused = false;
+
+          // 移除光标
+          const cursor = this.elements.area.querySelector(".cursor");
+          if (cursor) cursor.remove();
+
+          this.updateUIState("stopped");
+          this.updateStats();
+          this.showToast("打字完成！", "success");
+        }
+
+        continueTyping() {
+          this.typeNextChar();
+        }
+
+        updateUIState(state) {
+          const { container, status, startBtn, pauseBtn, stopBtn } =
+            this.elements;
+
+          // 重置状态
+          container.classList.remove("typing");
+          startBtn.disabled = false;
+          pauseBtn.disabled = true;
+          stopBtn.disabled = true;
+
+          switch (state) {
+            case "typing":
+              container.classList.add("typing");
+              status.textContent = "打字中...";
+              startBtn.disabled = true;
+              pauseBtn.disabled = false;
+              stopBtn.disabled = false;
+              break;
+            case "paused":
+              status.textContent = "已暂停";
+              startBtn.textContent = "▶️ 继续";
+              startBtn.disabled = false;
+              pauseBtn.disabled = true;
+              stopBtn.disabled = false;
+              break;
+            case "stopped":
+              status.textContent = "就绪";
+              startBtn.textContent = "▶️ 开始打字";
+              startBtn.disabled = false;
+              pauseBtn.disabled = true;
+              stopBtn.disabled = true;
+              break;
+          }
+        }
+
+        updateStats() {
+          // 字符数
+          this.elements.charCount.textContent = this.currentIndex;
+
+          // 时间
+          if (this.startTime && !this.isPaused) {
+            const elapsed =
+              (Date.now() - this.startTime - this.totalPauseTime) / 1000;
+            this.elements.timeElapsed.textContent = elapsed.toFixed(1) + "s";
+
+            // 速度
+            if (elapsed > 0) {
+              const speed = this.currentIndex / elapsed;
+              this.elements.typingSpeed.textContent = speed.toFixed(1);
+            } else {
+              this.elements.typingSpeed.textContent = "0";
+            }
+          } else if (this.isPaused) {
+            // 暂停时保持显示
+            const elapsed =
+              (this.pauseTime - this.startTime - this.totalPauseTime) / 1000;
+            this.elements.timeElapsed.textContent = elapsed.toFixed(1) + "s";
+          } else {
+            this.elements.timeElapsed.textContent = "0s";
+            this.elements.typingSpeed.textContent = "0";
+          }
+        }
+
+        copyContent() {
+          if (!this.currentText && this.elements.area.textContent === "") {
+            this.showToast("没有内容可复制", "error");
+            return;
+          }
+
+          const content = this.currentText || this.elements.area.textContent;
+
+          // 使用现代 Clipboard API
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard
+              .writeText(content)
+              .then(() => {
+                this.showToast("内容已复制到剪贴板", "success");
+                this.showCopyIndicator();
+              })
+              .catch(() => {
+                // 降级方案
+                this.fallbackCopy(content);
+              });
+          } else {
+            this.fallbackCopy(content);
+          }
+        }
+
+        fallbackCopy(text) {
+          const textarea = document.createElement("textarea");
+          textarea.value = text;
+          textarea.style.position = "fixed";
+          textarea.style.opacity = "0";
+          document.body.appendChild(textarea);
+          textarea.select();
+
+          try {
+            document.execCommand("copy");
+            this.showToast("内容已复制到剪贴板", "success");
+            this.showCopyIndicator();
+          } catch (err) {
+            this.showToast("复制失败，请手动复制", "error");
+          }
+
+          document.body.removeChild(textarea);
+        }
+
+        showCopyIndicator() {
+          const indicator = this.elements.copyIndicator;
+          indicator.classList.add("show");
+          setTimeout(() => {
+            indicator.classList.remove("show");
+          }, 1500);
+        }
+
+        showToast(message, type = "success") {
+          const toast = this.elements.toast;
+          toast.textContent = message;
+          toast.className = "toast show";
+
+          if (type === "error") {
+            toast.classList.add("error");
+          }
+
+          setTimeout(() => {
+            toast.classList.remove("show");
+          }, 3000);
+        }
+      }
+
+      // 初始化
+      document.addEventListener("DOMContentLoaded", () => {
+        new TypingAnimation();
+      });
+    </script>
+  </body>
+</html>

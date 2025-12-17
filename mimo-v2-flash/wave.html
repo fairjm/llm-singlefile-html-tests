@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>高级波浪背景特效</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: #0a0a0a;
+        min-height: 100vh;
+        overflow: hidden;
+        position: relative;
+      }
+
+      /* 波浪画布 */
+      #waveCanvas {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+      }
+
+      /* 磨砂质感叠加层 */
+      .frosted-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(
+            circle at 20% 30%,
+            rgba(255, 255, 255, 0.02) 0%,
+            transparent 50%
+          ),
+          radial-gradient(
+            circle at 80% 70%,
+            rgba(255, 255, 255, 0.02) 0%,
+            transparent 50%
+          ),
+          repeating-linear-gradient(
+            0deg,
+            rgba(255, 255, 255, 0.01) 0px,
+            rgba(255, 255, 255, 0.01) 1px,
+            transparent 1px,
+            transparent 2px
+          );
+        pointer-events: none;
+        z-index: 2;
+        mix-blend-mode: overlay;
+      }
+
+      /* 控制面板容器 */
+      .control-container {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: rgba(20, 20, 20, 0.85);
+        backdrop-filter: blur(20px);
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        z-index: 10;
+        width: 320px;
+        max-height: 85vh;
+        overflow-y: auto;
+        color: #fff;
+      }
+
+      .control-title {
+        font-size: 18px;
+        font-weight: 700;
+        margin-bottom: 20px;
+        text-align: center;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        letter-spacing: 0.5px;
+      }
+
+      .control-group {
+        margin-bottom: 20px;
+      }
+
+      .control-group label {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        color: #e0e0e0;
+        margin-bottom: 8px;
+        letter-spacing: 0.3px;
+      }
+
+      .control-group input[type="range"] {
+        width: 100%;
+        height: 6px;
+        border-radius: 3px;
+        background: rgba(255, 255, 255, 0.1);
+        outline: none;
+        -webkit-appearance: none;
+        transition: all 0.3s ease;
+      }
+
+      .control-group input[type="range"]:hover {
+        background: rgba(255, 255, 255, 0.15);
+      }
+
+      .control-group input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+      }
+
+      .control-group input[type="range"]::-webkit-slider-thumb:hover {
+        transform: scale(1.2);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.6);
+      }
+
+      .control-group input[type="range"]::-moz-range-thumb {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        cursor: pointer;
+        border: none;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+      }
+
+      .value-display {
+        display: inline-block;
+        background: rgba(102, 126, 234, 0.2);
+        color: #a5b4fc;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        margin-left: 8px;
+        min-width: 30px;
+        text-align: center;
+        border: 1px solid rgba(102, 126, 234, 0.3);
+      }
+
+      .button-group {
+        display: flex;
+        gap: 8px;
+        margin-top: 20px;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        flex: 1;
+        padding: 10px 16px;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 13px;
+        min-width: 80px;
+        letter-spacing: 0.3px;
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+      }
+
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5);
+      }
+
+      .btn-secondary {
+        background: rgba(255, 255, 255, 0.1);
+        color: #e0e0e0;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+
+      .btn-secondary:hover {
+        background: rgba(255, 255, 255, 0.15);
+        transform: translateY(-2px);
+      }
+
+      .btn-danger {
+        background: rgba(239, 68, 68, 0.2);
+        color: #fca5a5;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+      }
+
+      .btn-danger:hover {
+        background: rgba(239, 68, 68, 0.3);
+        transform: translateY(-2px);
+      }
+
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none !important;
+      }
+
+      .stats {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 8px;
+        padding: 12px;
+        margin-top: 16px;
+        font-size: 12px;
+        color: #b0b0b0;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .stats-item {
+        display: flex;
+        justify-content: space-between;
+        margin: 4px 0;
+      }
+
+      .stats-value {
+        font-weight: 600;
+        color: #a5b4fc;
+      }
+
+      .preset-group {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .preset-btn {
+        padding: 8px;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 6px;
+        color: #e0e0e0;
+        font-size: 11px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-weight: 500;
+      }
+
+      .preset-btn:hover {
+        background: rgba(102, 126, 234, 0.2);
+        border-color: rgba(102, 126, 234, 0.4);
+        transform: translateY(-1px);
+      }
+
+      /* 标题和副标题 */
+      .main-title {
+        position: fixed;
+        top: 30px;
+        left: 30px;
+        z-index: 10;
+        color: white;
+        text-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+      }
+
+      .main-title h1 {
+        font-size: 32px;
+        font-weight: 700;
+        margin-bottom: 8px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        letter-spacing: 1px;
+      }
+
+      .main-title p {
+        font-size: 14px;
+        color: rgba(255, 255, 255, 0.7);
+        font-weight: 400;
+        letter-spacing: 0.5px;
+      }
+
+      /* 滚动条样式 */
+      .control-container::-webkit-scrollbar {
+        width: 6px;
+      }
+
+      .control-container::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 3px;
+      }
+
+      .control-container::-webkit-scrollbar-thumb {
+        background: rgba(102, 126, 234, 0.5);
+        border-radius: 3px;
+      }
+
+      .control-container::-webkit-scrollbar-thumb:hover {
+        background: rgba(102, 126, 234, 0.7);
+      }
+
+      /* 响应式设计 */
+      @media (max-width: 768px) {
+        .control-container {
+          width: 280px;
+          right: 10px;
+          top: 10px;
+          padding: 16px;
+        }
+
+        .main-title {
+          left: 15px;
+          top: 15px;
+        }
+
+        .main-title h1 {
+          font-size: 24px;
+        }
+
+        .main-title p {
+          font-size: 12px;
+        }
+
+        .preset-group {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* 加载动画 */
+      .loading {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 14px;
+        z-index: 5;
+        text-align: center;
+      }
+
+      .loading::after {
+        content: "";
+        display: block;
+        width: 4px;
+        height: 4px;
+        margin: 8px auto;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        animation: loadingDot 1.4s infinite ease-in-out both;
+      }
+
+      @keyframes loadingDot {
+        0%,
+        80%,
+        100% {
+          transform: scale(0);
+        }
+        40% {
+          transform: scale(1);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- 主标题 -->
+    <div class="main-title">
+      <h1>🌊 高级波浪特效</h1>
+      <p>可自定义的动态波浪背景系统</p>
+    </div>
+
+    <!-- 波浪画布 -->
+    <canvas id="waveCanvas"></canvas>
+
+    <!-- 磨砂质感叠加层 -->
+    <div class="frosted-overlay"></div>
+
+    <!-- 加载提示 -->
+    <div class="loading" id="loading">正在初始化波浪系统...</div>
+
+    <!-- 控制面板 -->
+    <div class="control-container">
+      <div class="control-title">🎨 波浪控制面板</div>
+
+      <!-- 波浪强度 -->
+      <div class="control-group">
+        <label>
+          波浪强度
+          <span class="value-display" id="amplitudeValue">30</span>
+        </label>
+        <input
+          type="range"
+          id="amplitude"
+          min="10"
+          max="80"
+          value="30"
+          step="1"
+        />
+      </div>
+
+      <!-- 波浪数量 -->
+      <div class="control-group">
+        <label>
+          波浪数量
+          <span class="value-display" id="waveCountValue">3</span>
+        </label>
+        <input type="range" id="waveCount" min="1" max="8" value="3" step="1" />
+      </div>
+
+      <!-- 波浪次数（频率） -->
+      <div class="control-group">
+        <label>
+          波浪频率
+          <span class="value-display" id="frequencyValue">0.02</span>
+        </label>
+        <input
+          type="range"
+          id="frequency"
+          min="0.005"
+          max="0.05"
+          value="0.02"
+          step="0.001"
+        />
+      </div>
+
+      <!-- 浮动变化强度 -->
+      <div class="control-group">
+        <label>
+          浮动变化
+          <span class="value-display" id="floatValue">15</span>
+        </label>
+        <input
+          type="range"
+          id="floatIntensity"
+          min="0"
+          max="40"
+          value="15"
+          step="1"
+        />
+      </div>
+
+      <!-- 波浪速度 -->
+      <div class="control-group">
+        <label>
+          波浪速度
+          <span class="value-display" id="speedValue">0.5</span>
+        </label>
+        <input
+          type="range"
+          id="speed"
+          min="0.1"
+          max="2"
+          value="0.5"
+          step="0.1"
+        />
+      </div>
+
+      <!-- 渐变色强度 -->
+      <div class="control-group">
+        <label>
+          色彩强度
+          <span class="value-display" id="colorIntensityValue">0.8</span>
+        </label>
+        <input
+          type="range"
+          id="colorIntensity"
+          min="0.3"
+          max="1"
+          value="0.8"
+          step="0.1"
+        />
+      </div>
+
+      <!-- 磨砂质感强度 -->
+      <div class="control-group">
+        <label>
+          磨砂质感
+          <span class="value-display" id="frostValue">0.6</span>
+        </label>
+        <input
+          type="range"
+          id="frostIntensity"
+          min="0"
+          max="1"
+          value="0.6"
+          step="0.1"
+        />
+      </div>
+
+      <!-- 预设模式 -->
+      <div class="control-group">
+        <label>预设模式</label>
+        <div class="preset-group">
+          <button class="preset-btn" data-preset="calm">宁静</button>
+          <button class="preset-btn" data-preset="ocean">海洋</button>
+          <button class="preset-btn" data-preset="dreamy">梦幻</button>
+          <button class="preset-btn" data-preset="intense">强烈</button>
+        </div>
+      </div>
+
+      <!-- 控制按钮 -->
+      <div class="button-group">
+        <button class="btn btn-primary" id="startBtn">开始</button>
+        <button class="btn btn-secondary" id="pauseBtn" disabled>暂停</button>
+        <button class="btn btn-danger" id="stopBtn" disabled>停止</button>
+      </div>
+
+      <!-- 统计信息 -->
+      <div class="stats">
+        <div class="stats-item">
+          <span>状态:</span>
+          <span class="stats-value" id="statusText">待机</span>
+        </div>
+        <div class="stats-item">
+          <span>活跃波浪:</span>
+          <span class="stats-value" id="activeWaves">0</span>
+        </div>
+        <div class="stats-item">
+          <span>帧率:</span>
+          <span class="stats-value" id="fps">0</span>
+        </div>
+        <div class="stats-item">
+          <span>运行时间:</span>
+          <span class="stats-value" id="runtime">0s</span>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      class WaveSystem {
+        constructor() {
+          this.canvas = document.getElementById("waveCanvas");
+          this.ctx = this.canvas.getContext("2d");
+          this.isRunning = false;
+          this.isPaused = false;
+          this.animationId = null;
+          this.startTime = null;
+          this.lastFrameTime = 0;
+          this.frameCount = 0;
+          this.fps = 0;
+          this.fpsUpdateTime = 0;
+
+          // 配置参数
+          this.config = {
+            amplitude: 30,
+            waveCount: 3,
+            frequency: 0.02,
+            floatIntensity: 15,
+            speed: 0.5,
+            colorIntensity: 0.8,
+            frostIntensity: 0.6,
+          };
+
+          // 波浪数据
+          this.waves = [];
+          this.time = 0;
+
+          // DOM元素
+          this.elements = {
+            amplitude: document.getElementById("amplitude"),
+            amplitudeValue: document.getElementById("amplitudeValue"),
+            waveCount: document.getElementById("waveCount"),
+            waveCountValue: document.getElementById("waveCountValue"),
+            frequency: document.getElementById("frequency"),
+            frequencyValue: document.getElementById("frequencyValue"),
+            floatIntensity: document.getElementById("floatIntensity"),
+            floatValue: document.getElementById("floatValue"),
+            speed: document.getElementById("speed"),
+            speedValue: document.getElementById("speedValue"),
+            colorIntensity: document.getElementById("colorIntensity"),
+            colorIntensityValue: document.getElementById("colorIntensityValue"),
+            frostIntensity: document.getElementById("frostIntensity"),
+            frostValue: document.getElementById("frostValue"),
+            startBtn: document.getElementById("startBtn"),
+            pauseBtn: document.getElementById("pauseBtn"),
+            stopBtn: document.getElementById("stopBtn"),
+            statusText: document.getElementById("statusText"),
+            activeWaves: document.getElementById("activeWaves"),
+            fps: document.getElementById("fps"),
+            runtime: document.getElementById("runtime"),
+            loading: document.getElementById("loading"),
+            frostedOverlay: document.querySelector(".frosted-overlay"),
+          };
+
+          this.init();
+        }
+
+        init() {
+          this.resizeCanvas();
+          this.setupEventListeners();
+          this.updateDisplayValues();
+
+          // 隐藏加载提示
+          setTimeout(() => {
+            this.elements.loading.style.display = "none";
+          }, 1000);
+
+          // 窗口大小改变时重新调整画布
+          window.addEventListener("resize", () => this.resizeCanvas());
+        }
+
+        resizeCanvas() {
+          this.canvas.width = window.innerWidth;
+          this.canvas.height = window.innerHeight;
+        }
+
+        setupEventListeners() {
+          // 滑块输入
+          this.elements.amplitude.addEventListener("input", (e) => {
+            this.config.amplitude = parseFloat(e.target.value);
+            this.elements.amplitudeValue.textContent = this.config.amplitude;
+          });
+
+          this.elements.waveCount.addEventListener("input", (e) => {
+            this.config.waveCount = parseInt(e.target.value);
+            this.elements.waveCountValue.textContent = this.config.waveCount;
+            this.updateWaveCount();
+          });
+
+          this.elements.frequency.addEventListener("input", (e) => {
+            this.config.frequency = parseFloat(e.target.value);
+            this.elements.frequencyValue.textContent =
+              this.config.frequency.toFixed(3);
+          });
+
+          this.elements.floatIntensity.addEventListener("input", (e) => {
+            this.config.floatIntensity = parseFloat(e.target.value);
+            this.elements.floatValue.textContent = this.config.floatIntensity;
+          });
+
+          this.elements.speed.addEventListener("input", (e) => {
+            this.config.speed = parseFloat(e.target.value);
+            this.elements.speedValue.textContent = this.config.speed.toFixed(1);
+          });
+
+          this.elements.colorIntensity.addEventListener("input", (e) => {
+            this.config.colorIntensity = parseFloat(e.target.value);
+            this.elements.colorIntensityValue.textContent =
+              this.config.colorIntensity.toFixed(1);
+            this.updateFrostedOverlay();
+          });
+
+          this.elements.frostIntensity.addEventListener("input", (e) => {
+            this.config.frostIntensity = parseFloat(e.target.value);
+            this.elements.frostValue.textContent =
+              this.config.frostIntensity.toFixed(1);
+            this.updateFrostedOverlay();
+          });
+
+          // 按钮控制
+          this.elements.startBtn.addEventListener("click", () => this.start());
+          this.elements.pauseBtn.addEventListener("click", () => this.pause());
+          this.elements.stopBtn.addEventListener("click", () => this.stop());
+
+          // 预设按钮
+          document.querySelectorAll(".preset-btn").forEach((btn) => {
+            btn.addEventListener("click", (e) => {
+              const preset = e.target.dataset.preset;
+              this.applyPreset(preset);
+            });
+          });
+        }
+
+        updateDisplayValues() {
+          this.elements.amplitudeValue.textContent = this.config.amplitude;
+          this.elements.waveCountValue.textContent = this.config.waveCount;
+          this.elements.frequencyValue.textContent =
+            this.config.frequency.toFixed(3);
+          this.elements.floatValue.textContent = this.config.floatIntensity;
+          this.elements.speedValue.textContent = this.config.speed.toFixed(1);
+          this.elements.colorIntensityValue.textContent =
+            this.config.colorIntensity.toFixed(1);
+          this.elements.frostValue.textContent =
+            this.config.frostIntensity.toFixed(1);
+        }
+
+        updateFrostedOverlay() {
+          const opacity = this.config.frostIntensity * 0.3;
+          this.elements.frostedOverlay.style.opacity =
+            this.config.frostIntensity;
+
+          // 根据色彩强度调整叠加层的亮度
+          const brightness = this.config.colorIntensity * 0.1;
+          this.elements.frostedOverlay.style.background = `
+                    radial-gradient(circle at 20% 30%, rgba(255, 255, 255, ${
+                      opacity * 0.02
+                    }) 0%, transparent 50%),
+                    radial-gradient(circle at 80% 70%, rgba(255, 255, 255, ${
+                      opacity * 0.02
+                    }) 0%, transparent 50%),
+                    repeating-linear-gradient(0deg, rgba(255, 255, 255, ${
+                      opacity * 0.01
+                    }) 0px, rgba(255, 255, 255, ${
+            opacity * 0.01
+          }) 1px, transparent 1px, transparent 2px)
+                `;
+        }
+
+        updateWaveCount() {
+          if (this.isRunning && !this.isPaused) {
+            this.initializeWaves();
+          }
+        }
+
+        applyPreset(preset) {
+          const presets = {
+            calm: {
+              amplitude: 20,
+              waveCount: 2,
+              frequency: 0.015,
+              floatIntensity: 8,
+              speed: 0.3,
+              colorIntensity: 0.6,
+              frostIntensity: 0.8,
+            },
+            ocean: {
+              amplitude: 45,
+              waveCount: 4,
+              frequency: 0.025,
+              floatIntensity: 25,
+              speed: 0.8,
+              colorIntensity: 0.9,
+              frostIntensity: 0.5,
+            },
+            dreamy: {
+              amplitude: 35,
+              waveCount: 3,
+              frequency: 0.01,
+              floatIntensity: 30,
+              speed: 0.4,
+              colorIntensity: 0.7,
+              frostIntensity: 0.9,
+            },
+            intense: {
+              amplitude: 60,
+              waveCount: 6,
+              frequency: 0.035,
+              floatIntensity: 35,
+              speed: 1.2,
+              colorIntensity: 1.0,
+              frostIntensity: 0.3,
+            },
+          };
+
+          const config = presets[preset];
+          if (config) {
+            this.config = { ...config };
+
+            // 更新滑块
+            this.elements.amplitude.value = config.amplitude;
+            this.elements.waveCount.value = config.waveCount;
+            this.elements.frequency.value = config.frequency;
+            this.elements.floatIntensity.value = config.floatIntensity;
+            this.elements.speed.value = config.speed;
+            this.elements.colorIntensity.value = config.colorIntensity;
+            this.elements.frostIntensity.value = config.frostIntensity;
+
+            this.updateDisplayValues();
+            this.updateFrostedOverlay();
+
+            // 如果正在运行，重新初始化波浪
+            if (this.isRunning && !this.isPaused) {
+              this.initializeWaves();
+            }
+
+            this.updateStatus(`已应用 ${preset} 预设`);
+          }
+        }
+
+        initializeWaves() {
+          this.waves = [];
+          for (let i = 0; i < this.config.waveCount; i++) {
+            this.waves.push({
+              offset: ((Math.PI * 2) / this.config.waveCount) * i,
+              phase: Math.random() * Math.PI * 2,
+              amplitudeVariation: 0.8 + Math.random() * 0.4,
+              frequencyVariation: 0.9 + Math.random() * 0.2,
+              floatPhase: Math.random() * Math.PI * 2,
+              floatSpeed: 0.5 + Math.random() * 0.5,
+            });
+          }
+          this.elements.activeWaves.textContent = this.waves.length;
+        }
+
+        start() {
+          if (this.isRunning && !this.isPaused) return;
+
+          if (this.isPaused) {
+            // 恢复运行
+            this.isPaused = false;
+            this.lastFrameTime = performance.now();
+            this.animate();
+            this.updateUIState("running");
+            this.updateStatus("运行中");
+            return;
+          }
+
+          // 开始新的运行
+          this.isRunning = true;
+          this.isPaused = false;
+          this.startTime = performance.now();
+          this.lastFrameTime = this.startTime;
+          this.frameCount = 0;
+          this.fpsUpdateTime = this.startTime;
+          this.time = 0;
+
+          this.initializeWaves();
+          this.animate();
+          this.updateUIState("running");
+          this.updateStatus("运行中");
+        }
+
+        pause() {
+          if (!this.isRunning || this.isPaused) return;
+
+          this.isPaused = true;
+          if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+            this.animationId = null;
+          }
+
+          this.updateUIState("paused");
+          this.updateStatus("已暂停");
+        }
+
+        stop() {
+          if (!this.isRunning) return;
+
+          this.isRunning = false;
+          this.isPaused = false;
+
+          if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+            this.animationId = null;
+          }
+
+          // 清空画布
+          this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+          // 重置统计
+          this.elements.fps.textContent = "0";
+          this.elements.runtime.textContent = "0s";
+          this.elements.activeWaves.textContent = "0";
+
+          this.updateUIState("stopped");
+          this.updateStatus("已停止");
+        }
+
+        animate(currentTime = 0) {
+          if (!this.isRunning || this.isPaused) return;
+
+          const deltaTime = currentTime - this.lastFrameTime;
+          this.lastFrameTime = currentTime;
+
+          // 更新时间
+          this.time += deltaTime * 0.001 * this.config.speed;
+
+          // 更新FPS
+          this.frameCount++;
+          if (currentTime - this.fpsUpdateTime > 1000) {
+            this.fps = Math.round(
+              (this.frameCount * 1000) / (currentTime - this.fpsUpdateTime)
+            );
+            this.elements.fps.textContent = this.fps;
+            this.frameCount = 0;
+            this.fpsUpdateTime = currentTime;
+          }
+
+          // 更新运行时间
+          const runtime = ((currentTime - this.startTime) / 1000).toFixed(1);
+          this.elements.runtime.textContent = runtime + "s";
+
+          // 绘制波浪
+          this.drawWaves();
+
+          // 继续动画
+          this.animationId = requestAnimationFrame((time) =>
+            this.animate(time)
+          );
+        }
+
+        drawWaves() {
+          const { width, height } = this.canvas;
+          const ctx = this.ctx;
+
+          // 清空画布
+          ctx.clearRect(0, 0, width, height);
+
+          // 创建渐变背景
+          const bgGradient = ctx.createLinearGradient(0, 0, 0, height);
+          const colorIntensity = this.config.colorIntensity;
+
+          // 根据时间变化的微妙色彩
+          const hue1 = 220 + Math.sin(this.time * 0.1) * 10;
+          const hue2 = 280 + Math.cos(this.time * 0.15) * 15;
+
+          bgGradient.addColorStop(0, `hsla(${hue1}, 60%, 8%, 1)`);
+          bgGradient.addColorStop(
+            0.5,
+            `hsla(${(hue1 + hue2) / 2}, 55%, 6%, 1)`
+          );
+          bgGradient.addColorStop(1, `hsla(${hue2}, 60%, 8%, 1)`);
+
+          ctx.fillStyle = bgGradient;
+          ctx.fillRect(0, 0, width, height);
+
+          // 绘制每个波浪
+          this.waves.forEach((wave, index) => {
+            this.drawSingleWave(wave, index);
+          });
+
+          // 添加微妙的光晕效果
+          this.drawGlowEffect();
+        }
+
+        drawSingleWave(wave, index) {
+          const { width, height } = this.canvas;
+          const ctx = this.ctx;
+
+          // 计算当前波浪的参数
+          const baseAmplitude = this.config.amplitude * wave.amplitudeVariation;
+          const baseFrequency = this.config.frequency * wave.frequencyVariation;
+
+          // 浮动变化
+          const floatOffset =
+            Math.sin(this.time * wave.floatSpeed + wave.floatPhase) *
+            this.config.floatIntensity;
+          const centerY = height * 0.5 + floatOffset;
+
+          // 创建波浪路径
+          ctx.beginPath();
+          ctx.moveTo(0, centerY);
+
+          const points = Math.ceil(width / 3); // 优化性能，减少点数
+          for (let x = 0; x <= width; x += width / points) {
+            // 复合波浪计算：多个正弦波叠加
+            const t = this.time;
+            const phase1 = wave.phase + t;
+            const phase2 = wave.phase + t * 1.3 + wave.offset;
+            const phase3 = wave.phase + t * 0.7 + wave.offset * 0.5;
+
+            // 主波浪
+            const y1 = Math.sin(x * baseFrequency + phase1) * baseAmplitude;
+
+            // 次波浪（增加复杂性）
+            const y2 =
+              Math.sin(x * baseFrequency * 1.8 + phase2) * baseAmplitude * 0.4;
+
+            // 高频波动（增加细节）
+            const y3 =
+              Math.sin(x * baseFrequency * 3.2 + phase3) * baseAmplitude * 0.15;
+
+            const y = centerY + y1 + y2 + y3;
+            ctx.lineTo(x, y);
+          }
+
+          // 完成路径
+          ctx.lineTo(width, height);
+          ctx.lineTo(0, height);
+          ctx.closePath();
+
+          // 创建渐变填充
+          const gradient = ctx.createLinearGradient(
+            0,
+            centerY - baseAmplitude * 2,
+            0,
+            height
+          );
+
+          // 根据索引和时间计算颜色
+          const hueBase = 220 + index * 20;
+          const hueShift = Math.sin(this.time * 0.2 + index) * 10;
+          const finalHue = hueBase + hueShift;
+
+          const alpha = this.config.colorIntensity * (0.15 + index * 0.08);
+
+          gradient.addColorStop(0, `hsla(${finalHue}, 70%, 60%, ${alpha})`);
+          gradient.addColorStop(
+            0.4,
+            `hsla(${finalHue + 20}, 65%, 50%, ${alpha * 0.6})`
+          );
+          gradient.addColorStop(1, `hsla(${finalHue + 40}, 60%, 40%, 0)`);
+
+          ctx.fillStyle = gradient;
+          ctx.fill();
+
+          // 添加波浪边缘光效
+          if (this.config.colorIntensity > 0.6) {
+            ctx.strokeStyle = `hsla(${finalHue}, 80%, 70%, ${alpha * 0.3})`;
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+          }
+        }
+
+        drawGlowEffect() {
+          if (this.config.colorIntensity < 0.7) return;
+
+          const { width, height } = this.canvas;
+          const ctx = this.ctx;
+
+          // 创建中心光晕
+          const centerX = width / 2;
+          const centerY = height / 2;
+          const glowRadius = Math.min(width, height) * 0.3;
+
+          const gradient = ctx.createRadialGradient(
+            centerX,
+            centerY,
+            0,
+            centerX,
+            centerY,
+            glowRadius
+          );
+
+          const glowIntensity = (this.config.colorIntensity - 0.6) * 0.3;
+          const hue = 240 + Math.sin(this.time * 0.1) * 30;
+
+          gradient.addColorStop(
+            0,
+            `hsla(${hue}, 80%, 60%, ${glowIntensity * 0.2})`
+          );
+          gradient.addColorStop(
+            0.5,
+            `hsla(${hue + 20}, 70%, 50%, ${glowIntensity * 0.1})`
+          );
+          gradient.addColorStop(1, `hsla(${hue + 40}, 60%, 40%, 0)`);
+
+          ctx.fillStyle = gradient;
+          ctx.fillRect(0, 0, width, height);
+        }
+
+        updateUIState(state) {
+          const { startBtn, pauseBtn, stopBtn } = this.elements;
+
+          switch (state) {
+            case "running":
+              startBtn.disabled = true;
+              pauseBtn.disabled = false;
+              stopBtn.disabled = false;
+              break;
+            case "paused":
+              startBtn.disabled = false;
+              startBtn.textContent = "▶️ 继续";
+              pauseBtn.disabled = true;
+              stopBtn.disabled = false;
+              break;
+            case "stopped":
+              startBtn.disabled = false;
+              startBtn.textContent = "开始";
+              pauseBtn.disabled = true;
+              stopBtn.disabled = true;
+              break;
+          }
+        }
+
+        updateStatus(text) {
+          this.elements.statusText.textContent = text;
+        }
+      }
+
+      // 初始化系统
+      document.addEventListener("DOMContentLoaded", () => {
+        new WaveSystem();
+      });
+    </script>
+  </body>
+</html>

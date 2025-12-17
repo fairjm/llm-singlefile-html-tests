@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>雨滴玻璃效果 v2 - Rain on Glass v2</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(
+          135deg,
+          #0f0c29 0%,
+          #302b63 50%,
+          #24243e 100%
+        );
+        min-height: 100vh;
+        overflow: hidden;
+        position: relative;
+      }
+
+      .container {
+        position: relative;
+        width: 100%;
+        height: 100vh;
+        z-index: 10;
+      }
+
+      .glass-canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.03);
+        backdrop-filter: blur(3px);
+        cursor: crosshair;
+      }
+
+      .control-panel {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        width: 300px;
+        max-height: 85vh;
+        overflow-y: auto;
+        z-index: 100;
+      }
+
+      .control-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: #1a1a2e;
+        margin-bottom: 16px;
+        text-align: center;
+        border-bottom: 2px solid #3b82f6;
+        padding-bottom: 8px;
+      }
+
+      .control-group {
+        margin-bottom: 16px;
+      }
+
+      .control-group label {
+        display: block;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 6px;
+        font-size: 13px;
+      }
+
+      .control-group input[type="range"] {
+        width: 100%;
+        height: 6px;
+        border-radius: 3px;
+        background: #e2e8f0;
+        outline: none;
+        -webkit-appearance: none;
+      }
+
+      .control-group input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #3b82f6;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .control-group input[type="range"]::-webkit-slider-thumb:hover {
+        background: #2563eb;
+        transform: scale(1.2);
+      }
+
+      .control-group input[type="range"]::-moz-range-thumb {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #3b82f6;
+        cursor: pointer;
+        border: none;
+      }
+
+      .value-display {
+        display: inline-block;
+        background: #3b82f6;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        margin-left: 8px;
+        min-width: 30px;
+        text-align: center;
+      }
+
+      .button-group {
+        display: flex;
+        gap: 8px;
+        margin-top: 16px;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        flex: 1;
+        padding: 8px 12px;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 12px;
+        min-width: 60px;
+      }
+
+      .btn-primary {
+        background: #3b82f6;
+        color: white;
+      }
+
+      .btn-primary:hover {
+        background: #2563eb;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+      }
+
+      .btn-secondary {
+        background: #64748b;
+        color: white;
+      }
+
+      .btn-secondary:hover {
+        background: #475569;
+        transform: translateY(-1px);
+      }
+
+      .btn-danger {
+        background: #ef4444;
+        color: white;
+      }
+
+      .btn-danger:hover {
+        background: #dc2626;
+        transform: translateY(-1px);
+      }
+
+      .btn-success {
+        background: #10b981;
+        color: white;
+      }
+
+      .btn-success:hover {
+        background: #059669;
+        transform: translateY(-1px);
+      }
+
+      .stats {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 12px;
+        padding: 12px;
+        margin-top: 16px;
+        font-size: 12px;
+        color: #333;
+        border: 1px solid #e2e8f0;
+      }
+
+      .stats-item {
+        display: flex;
+        justify-content: space-between;
+        margin: 4px 0;
+      }
+
+      .stats-value {
+        font-weight: 600;
+        color: #3b82f6;
+      }
+
+      .wind-indicator {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        background: rgba(255, 255, 255, 0.9);
+        padding: 12px 16px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        color: #333;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      }
+
+      .wind-arrow {
+        font-size: 20px;
+        transition: transform 0.3s ease;
+      }
+
+      .title {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 24px;
+        font-weight: 700;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+        z-index: 5;
+        text-align: center;
+      }
+
+      .subtitle {
+        position: absolute;
+        bottom: 50px;
+        left: 50%;
+        transform: translateX(-50%);
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 14px;
+        z-index: 5;
+        text-align: center;
+      }
+
+      /* Scrollbar styling */
+      .control-panel::-webkit-scrollbar {
+        width: 6px;
+      }
+
+      .control-panel::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 3px;
+      }
+
+      .control-panel::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 3px;
+      }
+
+      .control-panel::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+
+      /* Click ripple effect */
+      .ripple {
+        position: absolute;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.6);
+        transform: scale(0);
+        animation: ripple-animation 0.6s ease-out;
+        pointer-events: none;
+        z-index: 50;
+      }
+
+      @keyframes ripple-animation {
+        to {
+          transform: scale(4);
+          opacity: 0;
+        }
+      }
+
+      /* Responsive */
+      @media (max-width: 768px) {
+        .control-panel {
+          width: 240px;
+          top: 10px;
+          right: 10px;
+          padding: 16px;
+        }
+
+        .title {
+          font-size: 18px;
+          bottom: 10px;
+        }
+
+        .subtitle {
+          font-size: 12px;
+          bottom: 35px;
+        }
+
+        .wind-indicator {
+          top: 10px;
+          left: 10px;
+          font-size: 12px;
+          padding: 8px 12px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <canvas class="glass-canvas" id="rainCanvas"></canvas>
+
+      <div class="wind-indicator">
+        <span class="wind-arrow" id="windArrow">→</span>
+        <span id="windText">风速: 0</span>
+      </div>
+
+      <div class="control-panel">
+        <div class="control-title">🌧️ 雨滴控制面板 v2</div>
+
+        <div class="control-group">
+          <label
+            >雨滴密度
+            <span class="value-display" id="densityValue">50</span></label
+          >
+          <input
+            type="range"
+            id="density"
+            min="10"
+            max="200"
+            value="50"
+            step="10"
+          />
+        </div>
+
+        <div class="control-group">
+          <label
+            >基础重力
+            <span class="value-display" id="gravityValue">9.8</span></label
+          >
+          <input
+            type="range"
+            id="gravity"
+            min="5"
+            max="20"
+            value="9.8"
+            step="0.2"
+          />
+        </div>
+
+        <div class="control-group">
+          <label
+            >风速
+            <span class="value-display" id="windSpeedValue">2</span></label
+          >
+          <input
+            type="range"
+            id="windSpeed"
+            min="-10"
+            max="10"
+            value="2"
+            step="0.5"
+          />
+        </div>
+
+        <div class="control-group">
+          <label
+            >风向角度
+            <span class="value-display" id="windAngleValue">0°</span></label
+          >
+          <input
+            type="range"
+            id="windAngle"
+            min="0"
+            max="360"
+            value="0"
+            step="15"
+          />
+        </div>
+
+        <div class="control-group">
+          <label
+            >摩擦力
+            <span class="value-display" id="frictionValue">0.95</span></label
+          >
+          <input
+            type="range"
+            id="friction"
+            min="0.8"
+            max="1"
+            value="0.95"
+            step="0.01"
+          />
+        </div>
+
+        <div class="control-group">
+          <label
+            >雨滴大小范围
+            <span class="value-display" id="sizeValue">2-8px</span></label
+          >
+          <input
+            type="range"
+            id="minSize"
+            min="1"
+            max="5"
+            value="2"
+            step="0.5"
+          />
+          <input
+            type="range"
+            id="maxSize"
+            min="4"
+            max="12"
+            value="8"
+            step="0.5"
+            style="margin-top: 8px"
+          />
+        </div>
+
+        <div class="control-group">
+          <label
+            >融合阈值
+            <span class="value-display" id="mergeValue">20</span></label
+          >
+          <input
+            type="range"
+            id="mergeThreshold"
+            min="5"
+            max="40"
+            value="20"
+            step="1"
+          />
+        </div>
+
+        <div class="control-group">
+          <label
+            >大小对速度影响系数
+            <span class="value-display" id="sizeSpeedValue">0.8</span></label
+          >
+          <input
+            type="range"
+            id="sizeSpeedFactor"
+            min="0"
+            max="2"
+            value="0.8"
+            step="0.1"
+          />
+        </div>
+
+        <div class="button-group">
+          <button class="btn btn-primary" id="startBtn">开始</button>
+          <button class="btn btn-secondary" id="pauseBtn">暂停</button>
+          <button class="btn btn-danger" id="clearBtn">清空</button>
+        </div>
+
+        <div class="button-group">
+          <button class="btn btn-success" id="heavyRainBtn">暴雨</button>
+          <button class="btn btn-secondary" id="lightRainBtn">小雨</button>
+          <button class="btn btn-primary" id="windyBtn">大风</button>
+        </div>
+
+        <div class="stats">
+          <div class="stats-item">
+            <span>活跃雨滴:</span>
+            <span class="stats-value" id="activeDrops">0</span>
+          </div>
+          <div class="stats-item">
+            <span>融合次数:</span>
+            <span class="stats-value" id="mergeCount">0</span>
+          </div>
+          <div class="stats-item">
+            <span>点击次数:</span>
+            <span class="stats-value" id="clickCount">0</span>
+          </div>
+          <div class="stats-item">
+            <span>平均速度:</span>
+            <span class="stats-value" id="avgSpeed">0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="subtitle">点击玻璃任意位置创建雨滴 - 大小影响滑落速度</div>
+      <div class="title">💧 雨滴滴落在玻璃上 v2</div>
+    </div>
+
+    <script>
+      class RainDropV2 {
+        constructor(x, y, size, gravity, wind, friction, sizeSpeedFactor) {
+          this.x = x;
+          this.y = y;
+          this.size = size;
+          this.gravity = gravity;
+          this.wind = wind;
+          this.friction = friction;
+          this.sizeSpeedFactor = sizeSpeedFactor;
+
+          // 质量与大小平方成正比
+          this.mass = size * size;
+
+          // 初始速度：大小影响初始下落速度
+          this.vx = 0;
+          this.vy = this.getInitialSpeed();
+
+          // 轨迹记录
+          this.trail = [];
+          this.maxTrailLength = Math.floor(3 + size * 0.5);
+
+          // 生命值
+          this.life = 1.0;
+          this.merged = false;
+
+          // 颜色基于大小
+          this.color = this.getColorBySize();
+        }
+
+        getInitialSpeed() {
+          // 大雨滴初始速度更快
+          const baseSpeed = this.gravity * 0.3;
+          const sizeBonus = this.size * this.sizeSpeedFactor * 0.5;
+          return baseSpeed + sizeBonus;
+        }
+
+        getColorBySize() {
+          // 小雨滴更透明，大雨滴更亮
+          const sizeRatio = Math.min(this.size / 12, 1);
+          const r = Math.floor(180 + sizeRatio * 75);
+          const g = Math.floor(200 + sizeRatio * 55);
+          const b = 255;
+          return { r, g, b };
+        }
+
+        update(windSpeed, windAngle, friction, gravity, sizeSpeedFactor) {
+          this.sizeSpeedFactor = sizeSpeedFactor;
+
+          // 计算风力分量
+          const windRad = (windAngle * Math.PI) / 180;
+          const windX = Math.cos(windRad) * windSpeed;
+          const windY = Math.sin(windRad) * windSpeed;
+
+          // 大小对加速度的影响：大雨滴受重力影响更大
+          const sizeGravityMultiplier = 1 + (this.size / 12) * sizeSpeedFactor;
+          const effectiveGravity = gravity * sizeGravityMultiplier;
+
+          // 更新速度
+          this.vx += windX * 0.15;
+          this.vy += (effectiveGravity + windY) * 0.12;
+
+          // 大小对摩擦力的影响：大雨滴受空气阻力影响更小（惯性更大）
+          const sizeFrictionMultiplier = 1 - this.size / 20;
+          const effectiveFriction = friction * sizeFrictionMultiplier;
+
+          // 应用摩擦力
+          this.vx *= effectiveFriction;
+          this.vy *= effectiveFriction;
+
+          // 限制最大速度（大雨滴可以更快）
+          const maxSpeedBase = 12;
+          const maxSpeed = maxSpeedBase + this.size * sizeSpeedFactor * 0.8;
+          const currentSpeed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+
+          if (currentSpeed > maxSpeed) {
+            this.vx = (this.vx / currentSpeed) * maxSpeed;
+            this.vy = (this.vy / currentSpeed) * maxSpeed;
+          }
+
+          // 更新位置
+          this.x += this.vx;
+          this.y += this.vy;
+
+          // 添加轨迹（大雨滴轨迹更长）
+          this.trail.push({ x: this.x, y: this.y });
+          if (this.trail.length > this.maxTrailLength) {
+            this.trail.shift();
+          }
+
+          // 边界处理
+          if (
+            this.x < -50 ||
+            this.x > window.innerWidth + 50 ||
+            this.y > window.innerHeight + 50
+          ) {
+            this.life = 0;
+          }
+
+          // 生命值衰减
+          this.life -= 0.0015;
+        }
+
+        draw(ctx) {
+          if (this.life <= 0) return;
+
+          // 绘制轨迹（带大小影响的透明度）
+          const trailAlpha = this.life * 0.4 * (this.size / 8);
+          ctx.strokeStyle = `rgba(${this.color.r}, ${this.color.g}, ${this.color.b}, ${trailAlpha})`;
+          ctx.lineWidth = this.size * 0.4;
+          ctx.lineCap = "round";
+          ctx.beginPath();
+
+          for (let i = 0; i < this.trail.length; i++) {
+            const point = this.trail[i];
+            const alpha = (i / this.trail.length) * trailAlpha;
+            if (i === 0) {
+              ctx.moveTo(point.x, point.y);
+            } else {
+              ctx.lineTo(point.x, point.y);
+            }
+          }
+          ctx.stroke();
+
+          // 绘制雨滴主体（基于大小的渐变）
+          const gradient = ctx.createRadialGradient(
+            this.x,
+            this.y,
+            0,
+            this.x,
+            this.y,
+            this.size
+          );
+
+          const mainAlpha = this.life * 0.9;
+          gradient.addColorStop(0, `rgba(255, 255, 255, ${mainAlpha})`);
+          gradient.addColorStop(
+            0.6,
+            `rgba(${this.color.r}, ${this.color.g}, ${this.color.b}, ${
+              mainAlpha * 0.7
+            })`
+          );
+          gradient.addColorStop(
+            1,
+            `rgba(${this.color.r - 50}, ${this.color.g - 30}, ${
+              this.color.b
+            }, ${mainAlpha * 0.3})`
+          );
+
+          ctx.fillStyle = gradient;
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 高光效果（大雨滴更明显）
+          const highlightSize = this.size * 0.35;
+          const highlightAlpha = this.life * (0.8 + this.size * 0.05);
+          ctx.fillStyle = `rgba(255, 255, 255, ${highlightAlpha})`;
+          ctx.beginPath();
+          ctx.arc(
+            this.x - this.size * 0.3,
+            this.y - this.size * 0.3,
+            highlightSize,
+            0,
+            Math.PI * 2
+          );
+          ctx.fill();
+
+          // 边缘光晕（大雨滴才有）
+          if (this.size > 5) {
+            ctx.strokeStyle = `rgba(${this.color.r}, ${this.color.g}, ${
+              this.color.b
+            }, ${this.life * 0.3})`;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size + 1, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+        }
+
+        getDistance(other) {
+          const dx = this.x - other.x;
+          const dy = this.y - other.y;
+          return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        merge(other) {
+          // 质量守恒
+          const totalMass = this.mass + other.mass;
+
+          // 新大小（考虑质量守恒，但保持合理范围）
+          this.size = Math.min(Math.sqrt(totalMass), 15);
+          this.mass = totalMass;
+
+          // 速度加权平均（按质量加权）
+          this.vx = (this.vx * this.mass + other.vx * other.mass) / totalMass;
+          this.vy = (this.vy * this.mass + other.vy * other.mass) / totalMass;
+
+          // 位置取中间点
+          this.x = (this.x + other.x) / 2;
+          this.y = (this.y + other.y) / 2;
+
+          // 增加轨迹长度
+          this.maxTrailLength = Math.min(12, this.maxTrailLength + 2);
+
+          // 更新颜色
+          this.color = this.getColorBySize();
+
+          this.merged = true;
+        }
+
+        isAlive() {
+          return this.life > 0 && this.y < window.innerHeight + 100;
+        }
+
+        getSpeed() {
+          return Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+        }
+      }
+
+      class RainSystemV2 {
+        constructor() {
+          this.canvas = document.getElementById("rainCanvas");
+          this.ctx = this.canvas.getContext("2d");
+          this.drops = [];
+          this.isRunning = false;
+          this.animationId = null;
+          this.lastTime = 0;
+          this.spawnTimer = 0;
+          this.mergeCount = 0;
+          this.clickCount = 0;
+
+          // 配置
+          this.config = {
+            density: 50,
+            gravity: 9.8,
+            windSpeed: 2,
+            windAngle: 0,
+            friction: 0.95,
+            minSize: 2,
+            maxSize: 8,
+            mergeThreshold: 20,
+            sizeSpeedFactor: 0.8,
+            spawnRate: 100,
+          };
+
+          // DOM元素
+          this.elements = {
+            density: document.getElementById("density"),
+            gravity: document.getElementById("gravity"),
+            windSpeed: document.getElementById("windSpeed"),
+            windAngle: document.getElementById("windAngle"),
+            friction: document.getElementById("friction"),
+            minSize: document.getElementById("minSize"),
+            maxSize: document.getElementById("maxSize"),
+            mergeThreshold: document.getElementById("mergeThreshold"),
+            sizeSpeedFactor: document.getElementById("sizeSpeedFactor"),
+            startBtn: document.getElementById("startBtn"),
+            pauseBtn: document.getElementById("pauseBtn"),
+            clearBtn: document.getElementById("clearBtn"),
+            heavyRainBtn: document.getElementById("heavyRainBtn"),
+            lightRainBtn: document.getElementById("lightRainBtn"),
+            windyBtn: document.getElementById("windyBtn"),
+            windArrow: document.getElementById("windArrow"),
+            windText: document.getElementById("windText"),
+            activeDrops: document.getElementById("activeDrops"),
+            mergeCount: document.getElementById("mergeCount"),
+            clickCount: document.getElementById("clickCount"),
+            avgSpeed: document.getElementById("avgSpeed"),
+          };
+
+          this.init();
+        }
+
+        init() {
+          this.resizeCanvas();
+          this.setupEventListeners();
+          this.updateDisplayValues();
+          this.updateWindIndicator();
+
+          window.addEventListener("resize", () => this.resizeCanvas());
+        }
+
+        resizeCanvas() {
+          this.canvas.width = window.innerWidth;
+          this.canvas.height = window.innerHeight;
+        }
+
+        setupEventListeners() {
+          // 滑块输入
+          this.elements.density.addEventListener("input", (e) => {
+            this.config.density = parseInt(e.target.value);
+            this.updateDisplayValues();
+          });
+
+          this.elements.gravity.addEventListener("input", (e) => {
+            this.config.gravity = parseFloat(e.target.value);
+            this.updateDisplayValues();
+          });
+
+          this.elements.windSpeed.addEventListener("input", (e) => {
+            this.config.windSpeed = parseFloat(e.target.value);
+            this.updateDisplayValues();
+            this.updateWindIndicator();
+          });
+
+          this.elements.windAngle.addEventListener("input", (e) => {
+            this.config.windAngle = parseInt(e.target.value);
+            this.updateDisplayValues();
+            this.updateWindIndicator();
+          });
+
+          this.elements.friction.addEventListener("input", (e) => {
+            this.config.friction = parseFloat(e.target.value);
+            this.updateDisplayValues();
+          });
+
+          this.elements.minSize.addEventListener("input", (e) => {
+            this.config.minSize = parseFloat(e.target.value);
+            this.updateDisplayValues();
+          });
+
+          this.elements.maxSize.addEventListener("input", (e) => {
+            this.config.maxSize = parseFloat(e.target.value);
+            this.updateDisplayValues();
+          });
+
+          this.elements.mergeThreshold.addEventListener("input", (e) => {
+            this.config.mergeThreshold = parseFloat(e.target.value);
+            this.updateDisplayValues();
+          });
+
+          this.elements.sizeSpeedFactor.addEventListener("input", (e) => {
+            this.config.sizeSpeedFactor = parseFloat(e.target.value);
+            this.updateDisplayValues();
+          });
+
+          // 按钮控制
+          this.elements.startBtn.addEventListener("click", () => this.start());
+          this.elements.pauseBtn.addEventListener("click", () => this.pause());
+          this.elements.clearBtn.addEventListener("click", () => this.clear());
+          this.elements.heavyRainBtn.addEventListener("click", () =>
+            this.setHeavyRain()
+          );
+          this.elements.lightRainBtn.addEventListener("click", () =>
+            this.setLightRain()
+          );
+          this.elements.windyBtn.addEventListener("click", () =>
+            this.setWindy()
+          );
+
+          // 画布点击事件
+          this.canvas.addEventListener("click", (e) =>
+            this.handleCanvasClick(e)
+          );
+        }
+
+        updateDisplayValues() {
+          document.getElementById("densityValue").textContent =
+            this.config.density;
+          document.getElementById("gravityValue").textContent =
+            this.config.gravity.toFixed(1);
+          document.getElementById("windSpeedValue").textContent =
+            this.config.windSpeed;
+          document.getElementById("windAngleValue").textContent =
+            this.config.windAngle + "°";
+          document.getElementById("frictionValue").textContent =
+            this.config.friction.toFixed(2);
+          document.getElementById(
+            "sizeValue"
+          ).textContent = `${this.config.minSize}-${this.config.maxSize}px`;
+          document.getElementById("mergeValue").textContent =
+            this.config.mergeThreshold;
+          document.getElementById("sizeSpeedValue").textContent =
+            this.config.sizeSpeedFactor.toFixed(1);
+        }
+
+        updateWindIndicator() {
+          const angle = this.config.windAngle;
+          const speed = Math.abs(this.config.windSpeed);
+
+          this.elements.windArrow.style.transform = `rotate(${angle}deg)`;
+
+          const direction =
+            this.config.windSpeed > 0
+              ? "→"
+              : this.config.windSpeed < 0
+              ? "←"
+              : "↓";
+          this.elements.windText.textContent = `风速: ${speed} ${direction}`;
+
+          this.elements.windArrow.style.opacity = speed > 0 ? "1" : "0.3";
+        }
+
+        handleCanvasClick(e) {
+          const rect = this.canvas.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+
+          // 创建多个雨滴形成点击效果
+          const dropCount = 3 + Math.floor(Math.random() * 3);
+          for (let i = 0; i < dropCount; i++) {
+            const offsetX = (Math.random() - 0.5) * 25;
+            const offsetY = (Math.random() - 0.5) * 25;
+            const size =
+              this.config.minSize +
+              Math.random() * (this.config.maxSize - this.config.minSize);
+
+            this.drops.push(
+              new RainDropV2(
+                x + offsetX,
+                y + offsetY,
+                size,
+                this.config.gravity,
+                this.config.windSpeed,
+                this.config.friction,
+                this.config.sizeSpeedFactor
+              )
+            );
+          }
+
+          this.createRipple(x, y);
+          this.clickCount++;
+          this.updateStats();
+        }
+
+        createRipple(x, y) {
+          const ripple = document.createElement("div");
+          ripple.className = "ripple";
+          ripple.style.left = x + "px";
+          ripple.style.top = y + "px";
+          ripple.style.width = "20px";
+          ripple.style.height = "20px";
+          document.body.appendChild(ripple);
+
+          setTimeout(() => {
+            if (ripple.parentNode) {
+              ripple.parentNode.removeChild(ripple);
+            }
+          }, 600);
+        }
+
+        start() {
+          if (this.isRunning) return;
+
+          this.isRunning = true;
+          this.lastTime = performance.now();
+          this.animate();
+
+          this.elements.startBtn.textContent = "运行中...";
+          this.elements.startBtn.disabled = true;
+        }
+
+        pause() {
+          this.isRunning = false;
+          if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+            this.animationId = null;
+          }
+
+          this.elements.startBtn.textContent = "继续";
+          this.elements.startBtn.disabled = false;
+        }
+
+        clear() {
+          this.pause();
+
+          this.drops = [];
+          this.mergeCount = 0;
+          this.clickCount = 0;
+
+          this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+          this.updateStats();
+
+          this.elements.startBtn.textContent = "开始";
+          this.elements.startBtn.disabled = false;
+        }
+
+        setHeavyRain() {
+          this.config.density = 150;
+          this.config.gravity = 15;
+          this.config.minSize = 4;
+          this.config.maxSize = 12;
+          this.config.sizeSpeedFactor = 1.2;
+          this.updateSlidersFromConfig();
+          this.updateDisplayValues();
+          this.showToast("已切换到暴雨模式");
+        }
+
+        setLightRain() {
+          this.config.density = 20;
+          this.config.gravity = 8;
+          this.config.minSize = 1;
+          this.config.maxSize = 3;
+          this.config.sizeSpeedFactor = 0.3;
+          this.updateSlidersFromConfig();
+          this.updateDisplayValues();
+          this.showToast("已切换到小雨模式");
+        }
+
+        setWindy() {
+          this.config.windSpeed = 8;
+          this.config.windAngle = 30;
+          this.config.friction = 0.92;
+          this.updateSlidersFromConfig();
+          this.updateDisplayValues();
+          this.updateWindIndicator();
+          this.showToast("已切换到大风模式");
+        }
+
+        updateSlidersFromConfig() {
+          this.elements.density.value = this.config.density;
+          this.elements.gravity.value = this.config.gravity;
+          this.elements.windSpeed.value = this.config.windSpeed;
+          this.elements.windAngle.value = this.config.windAngle;
+          this.elements.friction.value = this.config.friction;
+          this.elements.minSize.value = this.config.minSize;
+          this.elements.maxSize.value = this.config.maxSize;
+          this.elements.sizeSpeedFactor.value = this.config.sizeSpeedFactor;
+        }
+
+        showToast(message) {
+          const originalText = this.elements.startBtn.textContent;
+          if (this.elements.startBtn.textContent === "运行中...") {
+            this.elements.startBtn.textContent = message.substring(0, 4);
+            setTimeout(() => {
+              this.elements.startBtn.textContent = originalText;
+            }, 1000);
+          }
+        }
+
+        spawnDrop() {
+          if (this.drops.length > this.config.density * 3) return;
+
+          const x = Math.random() * window.innerWidth;
+          const y = -20;
+          const size =
+            this.config.minSize +
+            Math.random() * (this.config.maxSize - this.config.minSize);
+
+          this.drops.push(
+            new RainDropV2(
+              x,
+              y,
+              size,
+              this.config.gravity,
+              this.config.windSpeed,
+              this.config.friction,
+              this.config.sizeSpeedFactor
+            )
+          );
+        }
+
+        updateDrops(deltaTime) {
+          // 更新所有雨滴
+          for (let i = this.drops.length - 1; i >= 0; i--) {
+            const drop = this.drops[i];
+
+            drop.update(
+              this.config.windSpeed,
+              this.config.windAngle,
+              this.config.friction,
+              this.config.gravity,
+              this.config.sizeSpeedFactor
+            );
+
+            if (!drop.isAlive()) {
+              this.drops.splice(i, 1);
+            }
+          }
+
+          // 检测融合
+          this.checkMerges();
+        }
+
+        checkMerges() {
+          const mergeThreshold = this.config.mergeThreshold;
+
+          for (let i = 0; i < this.drops.length; i++) {
+            const drop1 = this.drops[i];
+            if (drop1.life <= 0) continue;
+
+            for (let j = i + 1; j < this.drops.length; j++) {
+              const drop2 = this.drops[j];
+              if (drop2.life <= 0) continue;
+
+              const distance = drop1.getDistance(drop2);
+
+              if (distance < mergeThreshold) {
+                // 融合条件优化：避免融合大小差异过大的雨滴
+                const sizeDiff = Math.abs(drop1.size - drop2.size);
+                const maxDiff = Math.max(drop1.size, drop2.size) * 0.6;
+
+                if (sizeDiff < maxDiff) {
+                  // 融合：保留较大的雨滴，移除较小的
+                  if (drop1.mass >= drop2.mass) {
+                    drop1.merge(drop2);
+                    drop2.life = 0;
+                  } else {
+                    drop2.merge(drop1);
+                    drop1.life = 0;
+                  }
+                  this.mergeCount++;
+                }
+              }
+            }
+          }
+        }
+
+        draw() {
+          // 清空画布（带轻微透明度实现拖尾效果）
+          this.ctx.fillStyle = "rgba(15, 12, 41, 0.15)";
+          this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+          // 绘制所有雨滴
+          for (const drop of this.drops) {
+            drop.draw(this.ctx);
+          }
+
+          // 绘制玻璃纹理效果
+          this.drawGlassTexture();
+        }
+
+        drawGlassTexture() {
+          // 玻璃反光效果
+          const gradient = this.ctx.createLinearGradient(
+            0,
+            0,
+            this.canvas.width,
+            this.canvas.height
+          );
+          gradient.addColorStop(0, "rgba(255, 255, 255, 0.015)");
+          gradient.addColorStop(0.3, "rgba(255, 255, 255, 0)");
+          gradient.addColorStop(0.7, "rgba(255, 255, 255, 0)");
+          gradient.addColorStop(1, "rgba(255, 255, 255, 0.01)");
+
+          this.ctx.fillStyle = gradient;
+          this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        }
+
+        animate(currentTime = 0) {
+          if (!this.isRunning) return;
+
+          const deltaTime = currentTime - this.lastTime;
+          this.lastTime = currentTime;
+
+          // 生成新雨滴
+          this.spawnTimer += deltaTime;
+          const spawnInterval =
+            this.config.spawnRate / (this.config.density / 50);
+
+          if (this.spawnTimer >= spawnInterval) {
+            this.spawnDrop();
+            this.spawnTimer = 0;
+          }
+
+          // 更新雨滴
+          this.updateDrops(deltaTime);
+
+          // 绘制
+          this.draw();
+
+          // 更新统计
+          this.updateStats();
+
+          this.animationId = requestAnimationFrame((time) =>
+            this.animate(time)
+          );
+        }
+
+        updateStats() {
+          this.elements.activeDrops.textContent = this.drops.length;
+          this.elements.mergeCount.textContent = this.mergeCount;
+          this.elements.clickCount.textContent = this.clickCount;
+
+          // 计算平均速度
+          if (this.drops.length > 0) {
+            const totalSpeed = this.drops.reduce(
+              (sum, drop) => sum + drop.getSpeed(),
+              0
+            );
+            const avgSpeed = totalSpeed / this.drops.length;
+            this.elements.avgSpeed.textContent = avgSpeed.toFixed(1);
+          } else {
+            this.elements.avgSpeed.textContent = "0";
+          }
+        }
+      }
+
+      // 初始化
+      document.addEventListener("DOMContentLoaded", () => {
+        const rainSystem = new RainSystemV2();
+
+        // 自动开始
+        setTimeout(() => {
+          rainSystem.start();
+        }, 1000);
+      });
+    </script>
+  </body>
+</html>

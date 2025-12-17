@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>蟑螂互动游戏</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        overflow: hidden;
+        cursor: crosshair;
+        user-select: none;
+      }
+
+      #gameCanvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(
+          circle at 20% 30%,
+          #2a2a3e 0%,
+          #0f0f1a 100%
+        );
+      }
+
+      .ui-overlay {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        color: white;
+        font-size: 14px;
+        background: rgba(0, 0, 0, 0.6);
+        padding: 15px;
+        border-radius: 10px;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        z-index: 100;
+      }
+
+      .ui-overlay h3 {
+        margin-bottom: 10px;
+        color: #ff6b6b;
+        font-size: 18px;
+      }
+
+      .ui-overlay p {
+        margin: 5px 0;
+        opacity: 0.9;
+      }
+
+      .stats {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        color: white;
+        background: rgba(0, 0, 0, 0.6);
+        padding: 15px;
+        border-radius: 10px;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        text-align: right;
+        z-index: 100;
+      }
+
+      .stats div {
+        margin: 5px 0;
+        font-size: 14px;
+      }
+
+      .stats .count {
+        font-size: 24px;
+        font-weight: bold;
+        color: #4ecdc4;
+      }
+
+      .title {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: white;
+        font-size: 48px;
+        font-weight: bold;
+        text-align: center;
+        pointer-events: none;
+        opacity: 0;
+        animation: fadeInOut 3s ease-in-out;
+        text-shadow: 0 0 20px rgba(255, 107, 107, 0.8);
+        z-index: 50;
+      }
+
+      @keyframes fadeInOut {
+        0% {
+          opacity: 0;
+          transform: translate(-50%, -50%) scale(0.5);
+        }
+        50% {
+          opacity: 1;
+          transform: translate(-50%, -50%) scale(1.1);
+        }
+        100% {
+          opacity: 0;
+          transform: translate(-50%, -50%) scale(1);
+        }
+      }
+
+      .click-effect {
+        position: absolute;
+        pointer-events: none;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 107, 107, 0.8);
+        animation: ripple 0.6s ease-out;
+        z-index: 99;
+      }
+
+      @keyframes ripple {
+        0% {
+          width: 0;
+          height: 0;
+          opacity: 1;
+        }
+        100% {
+          width: 60px;
+          height: 60px;
+          opacity: 0;
+        }
+      }
+
+      .explosion-particle {
+        position: absolute;
+        width: 4px;
+        height: 4px;
+        background: radial-gradient(circle, #ff6b6b, #ff8787);
+        border-radius: 50%;
+        pointer-events: none;
+        animation: explode 0.8s ease-out forwards;
+        z-index: 98;
+      }
+
+      @keyframes explode {
+        0% {
+          transform: translate(0, 0) scale(1);
+          opacity: 1;
+        }
+        100% {
+          transform: translate(var(--tx), var(--ty)) scale(0);
+          opacity: 0;
+        }
+      }
+
+      .dust-particle {
+        position: absolute;
+        width: 3px;
+        height: 3px;
+        background: rgba(150, 150, 150, 0.6);
+        border-radius: 50%;
+        pointer-events: none;
+        animation: dust 1s ease-out forwards;
+        z-index: 97;
+      }
+
+      @keyframes dust {
+        0% {
+          transform: translate(0, 0) scale(1);
+          opacity: 0.8;
+        }
+        100% {
+          transform: translate(var(--tx), var(--ty)) scale(0.3);
+          opacity: 0;
+        }
+      }
+
+      .speed-trail {
+        position: absolute;
+        width: 2px;
+        height: 2px;
+        background: rgba(78, 205, 196, 0.8);
+        border-radius: 50%;
+        pointer-events: none;
+        animation: trail 0.5s ease-out forwards;
+        z-index: 96;
+      }
+
+      @keyframes trail {
+        0% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        100% {
+          opacity: 0;
+          transform: scale(0);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="gameCanvas"></canvas>
+
+    <div class="ui-overlay">
+      <h3>🪳 蟑螂互动游戏</h3>
+      <p>🎯 点击蟑螂进行互动</p>
+      <p>⚡ 第一次点击：加速移动</p>
+      <p>💥 第二次点击：爆炸消失</p>
+      <p>🔄 随机生成，自动活动</p>
+    </div>
+
+    <div class="stats">
+      <div>活跃蟑螂</div>
+      <div class="count" id="cockroachCount">0</div>
+      <div>已消灭</div>
+      <div class="count" id="eliminatedCount">0</div>
+    </div>
+
+    <script>
+      class Cockroach {
+        constructor(x, y, canvas) {
+          this.x = x;
+          this.y = y;
+          this.canvas = canvas;
+          this.baseSpeed = 1 + Math.random() * 1.5;
+          this.speed = this.baseSpeed;
+          this.angle = Math.random() * Math.PI * 2;
+          this.size = 15 + Math.random() * 8;
+          this.state = "normal"; // normal, accelerated, exploded
+          this.clickCount = 0;
+          this.pauseTimer = 0;
+          this.turnTimer = 0;
+          this.color = `hsl(${20 + Math.random() * 20}, 60%, ${
+            25 + Math.random() * 15
+          }%)`;
+          this.legPhase = Math.random() * Math.PI * 2;
+          this.antennaPhase = Math.random() * Math.PI * 2;
+          this.alive = true;
+          this.trailTimer = 0;
+        }
+
+        update() {
+          if (!this.alive) return;
+
+          // 暂停逻辑
+          if (this.pauseTimer > 0) {
+            this.pauseTimer--;
+            this.legPhase += 0.1; // 待机动画
+            this.antennaPhase += 0.05;
+            return;
+          }
+
+          // 随机暂停
+          if (Math.random() < 0.005 && this.state !== "accelerated") {
+            this.pauseTimer = 30 + Math.random() * 60;
+            this.createDustEffect();
+          }
+
+          // 随机转向
+          if (this.turnTimer > 0) {
+            this.turnTimer--;
+          } else {
+            if (Math.random() < 0.02) {
+              this.angle += (Math.random() - 0.5) * Math.PI * 0.5;
+              this.turnTimer = 20 + Math.random() * 40;
+              this.createDustEffect();
+            }
+          }
+
+          // 移动
+          const currentSpeed =
+            this.state === "accelerated" ? this.speed * 2.5 : this.speed;
+          this.x += Math.cos(this.angle) * currentSpeed;
+          this.y += Math.sin(this.angle) * currentSpeed;
+
+          // 边界反弹
+          if (this.x < this.size || this.x > this.canvas.width - this.size) {
+            this.angle = Math.PI - this.angle;
+            this.x = Math.max(
+              this.size,
+              Math.min(this.canvas.width - this.size, this.x)
+            );
+          }
+          if (this.y < this.size || this.y > this.canvas.height - this.size) {
+            this.angle = -this.angle;
+            this.y = Math.max(
+              this.size,
+              Math.min(this.canvas.height - this.size, this.y)
+            );
+          }
+
+          // 动画更新
+          this.legPhase += this.state === "accelerated" ? 0.3 : 0.15;
+          this.antennaPhase += 0.1;
+
+          // 加速状态下的轨迹
+          if (this.state === "accelerated") {
+            this.trailTimer++;
+            if (this.trailTimer % 3 === 0) {
+              this.createSpeedTrail();
+            }
+          }
+        }
+
+        draw(ctx) {
+          if (!this.alive) return;
+
+          ctx.save();
+          ctx.translate(this.x, this.y);
+          ctx.rotate(this.angle);
+
+          // 阴影
+          ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+          ctx.shadowBlur = 5;
+          ctx.shadowOffsetX = 2;
+          ctx.shadowOffsetY = 2;
+
+          // 身体主体
+          ctx.fillStyle = this.color;
+          ctx.beginPath();
+          ctx.ellipse(
+            0,
+            0,
+            this.size * 0.8,
+            this.size * 0.5,
+            0,
+            0,
+            Math.PI * 2
+          );
+          ctx.fill();
+
+          // 头部
+          ctx.fillStyle = `hsl(${20 + Math.random() * 20}, 60%, ${
+            20 + Math.random() * 10
+          }%)`;
+          ctx.beginPath();
+          ctx.ellipse(
+            this.size * 0.6,
+            0,
+            this.size * 0.3,
+            this.size * 0.35,
+            0,
+            0,
+            Math.PI * 2
+          );
+          ctx.fill();
+
+          // 眼睛
+          ctx.fillStyle = "#ff6b6b";
+          ctx.beginPath();
+          ctx.arc(this.size * 0.7, -this.size * 0.15, 2, 0, Math.PI * 2);
+          ctx.arc(this.size * 0.7, this.size * 0.15, 2, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 触角
+          const antennaSwing = Math.sin(this.antennaPhase) * 3;
+          ctx.strokeStyle = "#888";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(this.size * 0.5, -this.size * 0.2);
+          ctx.quadraticCurveTo(
+            this.size * 0.8,
+            -this.size * 0.5 + antennaSwing,
+            this.size * 1.1,
+            -this.size * 0.6 + antennaSwing
+          );
+          ctx.moveTo(this.size * 0.5, this.size * 0.2);
+          ctx.quadraticCurveTo(
+            this.size * 0.8,
+            this.size * 0.5 + antennaSwing,
+            this.size * 1.1,
+            this.size * 0.6 + antennaSwing
+          );
+          ctx.stroke();
+
+          // 腿
+          ctx.strokeStyle = "#666";
+          ctx.lineWidth = 1.5;
+          const legCount = 6;
+          for (let i = 0; i < legCount; i++) {
+            const side = i < legCount / 2 ? -1 : 1;
+            const legIndex = i % (legCount / 2);
+            const legOffset = (legIndex - legCount / 4) * 3;
+            const legSwing = Math.sin(this.legPhase + legIndex * 0.5) * 2;
+
+            ctx.beginPath();
+            ctx.moveTo(legOffset, side * this.size * 0.3);
+            ctx.lineTo(legOffset + 4, side * (this.size * 0.6 + legSwing));
+            ctx.stroke();
+          }
+
+          // 加速状态特效
+          if (this.state === "accelerated") {
+            ctx.strokeStyle = "rgba(78, 205, 196, 0.6)";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.size * 1.2, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+
+          // 暂停状态眼睛动画
+          if (this.pauseTimer > 0) {
+            ctx.fillStyle = "#ff6b6b";
+            ctx.beginPath();
+            ctx.arc(this.size * 0.7, -this.size * 0.15, 2.5, 0, Math.PI * 2);
+            ctx.arc(this.size * 0.7, this.size * 0.15, 2.5, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          ctx.restore();
+        }
+
+        handleClick() {
+          if (!this.alive) return false;
+
+          this.clickCount++;
+
+          if (this.clickCount === 1) {
+            // 第一次点击：加速
+            this.state = "accelerated";
+            this.speed = this.baseSpeed * 2;
+            this.createSpeedEffect();
+            return "accelerated";
+          } else if (this.clickCount === 2) {
+            // 第二次点击：爆炸
+            this.explode();
+            return "exploded";
+          }
+          return "none";
+        }
+
+        explode() {
+          this.alive = false;
+          this.createExplosionEffect();
+        }
+
+        createExplosionEffect() {
+          const particleCount = 20;
+          for (let i = 0; i < particleCount; i++) {
+            const particle = document.createElement("div");
+            particle.className = "explosion-particle";
+            const angle = (Math.PI * 2 * i) / particleCount;
+            const distance = 50 + Math.random() * 50;
+            const tx = Math.cos(angle) * distance;
+            const ty = Math.sin(angle) * distance;
+
+            particle.style.left = this.x + "px";
+            particle.style.top = this.y + "px";
+            particle.style.setProperty("--tx", tx + "px");
+            particle.style.setProperty("--ty", ty + "px");
+
+            document.body.appendChild(particle);
+            setTimeout(() => particle.remove(), 800);
+          }
+
+          // 额外的烟雾效果
+          for (let i = 0; i < 10; i++) {
+            setTimeout(() => {
+              this.createDustEffect();
+            }, i * 50);
+          }
+        }
+
+        createDustEffect() {
+          const dustCount = 3 + Math.floor(Math.random() * 3);
+          for (let i = 0; i < dustCount; i++) {
+            const dust = document.createElement("div");
+            dust.className = "dust-particle";
+            const angle = Math.random() * Math.PI * 2;
+            const distance = 10 + Math.random() * 20;
+            const tx = Math.cos(angle) * distance;
+            const ty = Math.sin(angle) * distance;
+
+            dust.style.left = this.x + "px";
+            dust.style.top = this.y + "px";
+            dust.style.setProperty("--tx", tx + "px");
+            dust.style.setProperty("--ty", ty + "px");
+
+            document.body.appendChild(dust);
+            setTimeout(() => dust.remove(), 1000);
+          }
+        }
+
+        createSpeedEffect() {
+          for (let i = 0; i < 5; i++) {
+            setTimeout(() => this.createSpeedTrail(), i * 30);
+          }
+        }
+
+        createSpeedTrail() {
+          const trail = document.createElement("div");
+          trail.className = "speed-trail";
+          trail.style.left = this.x + "px";
+          trail.style.top = this.y + "px";
+          document.body.appendChild(trail);
+          setTimeout(() => trail.remove(), 500);
+        }
+
+        isPointInside(px, py) {
+          const dx = px - this.x;
+          const dy = py - this.y;
+          return Math.sqrt(dx * dx + dy * dy) < this.size;
+        }
+      }
+
+      class Game {
+        constructor() {
+          this.canvas = document.getElementById("gameCanvas");
+          this.ctx = this.canvas.getContext("2d");
+          this.cockroaches = [];
+          this.eliminatedCount = 0;
+          this.lastSpawnTime = 0;
+          this.spawnInterval = 2000; // 2秒生成一个
+
+          this.resizeCanvas();
+          window.addEventListener("resize", () => this.resizeCanvas());
+
+          this.canvas.addEventListener("click", (e) => this.handleClick(e));
+
+          this.updateUI();
+          this.gameLoop();
+          this.spawnInitialCockroaches();
+        }
+
+        resizeCanvas() {
+          this.canvas.width = window.innerWidth;
+          this.canvas.height = window.innerHeight;
+        }
+
+        spawnInitialCockroaches() {
+          // 初始生成3-5个蟑螂
+          const count = 3 + Math.floor(Math.random() * 3);
+          for (let i = 0; i < count; i++) {
+            setTimeout(() => this.spawnCockroach(), i * 500);
+          }
+        }
+
+        spawnCockroach() {
+          const margin = 50;
+          const x = margin + Math.random() * (this.canvas.width - margin * 2);
+          const y = margin + Math.random() * (this.canvas.height - margin * 2);
+          const cockroach = new Cockroach(x, y, this.canvas);
+          this.cockroaches.push(cockroach);
+          this.updateUI();
+        }
+
+        handleClick(e) {
+          const rect = this.canvas.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+
+          // 创建点击效果
+          this.createClickEffect(x, y);
+
+          // 检查是否点击到蟑螂
+          for (let i = this.cockroaches.length - 1; i >= 0; i--) {
+            const cockroach = this.cockroaches[i];
+            if (cockroach.isPointInside(x, y)) {
+              const result = cockroach.handleClick();
+
+              if (result === "exploded") {
+                // 移除爆炸的蟑螂
+                setTimeout(() => {
+                  const index = this.cockroaches.indexOf(cockroach);
+                  if (index > -1) {
+                    this.cockroaches.splice(index, 1);
+                    this.eliminatedCount++;
+                    this.updateUI();
+                  }
+                }, 100);
+              }
+              break;
+            }
+          }
+        }
+
+        createClickEffect(x, y) {
+          const effect = document.createElement("div");
+          effect.className = "click-effect";
+          effect.style.left = x - 30 + "px";
+          effect.style.top = y - 30 + "px";
+          document.body.appendChild(effect);
+          setTimeout(() => effect.remove(), 600);
+        }
+
+        updateUI() {
+          document.getElementById("cockroachCount").textContent =
+            this.cockroaches.length;
+          document.getElementById("eliminatedCount").textContent =
+            this.eliminatedCount;
+        }
+
+        gameLoop() {
+          // 清空画布
+          this.ctx.fillStyle = "rgba(15, 15, 26, 0.1)";
+          this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+          // 更新和绘制所有蟑螂
+          this.cockroaches.forEach((cockroach) => {
+            cockroach.update();
+            cockroach.draw(this.ctx);
+          });
+
+          // 自动补充蟑螂
+          const now = Date.now();
+          if (
+            now - this.lastSpawnTime > this.spawnInterval &&
+            this.cockroaches.length < 8
+          ) {
+            this.spawnCockroach();
+            this.lastSpawnTime = now;
+            // 随机调整生成间隔
+            this.spawnInterval = 1500 + Math.random() * 2000;
+          }
+
+          requestAnimationFrame(() => this.gameLoop());
+        }
+      }
+
+      // 启动游戏
+      window.addEventListener("DOMContentLoaded", () => {
+        // 显示标题动画
+        const title = document.createElement("div");
+        title.className = "title";
+        title.textContent = "🪳 蟑螂大作战";
+        document.body.appendChild(title);
+        setTimeout(() => title.remove(), 3000);
+
+        // 延迟一点启动游戏，让标题动画先显示
+        setTimeout(() => {
+          new Game();
+        }, 500);
+      });
+    </script>
+  </body>
+</html>

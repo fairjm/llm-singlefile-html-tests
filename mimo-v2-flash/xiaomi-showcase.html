@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>小米科技 - 创新与极致性价比</title>
+
+    <!-- CDN 引入现代化库 -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        --primary-orange: #ff6900;
+        --dark-bg: #0a0a0a;
+        --glass-bg: rgba(255, 255, 255, 0.05);
+        --glass-border: rgba(255, 255, 255, 0.1);
+        --text-primary: #ffffff;
+        --text-secondary: #b0b0b0;
+      }
+
+      body {
+        font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+        background: var(--dark-bg);
+        color: var(--text-primary);
+        overflow-x: hidden;
+        line-height: 1.6;
+      }
+
+      /* 粒子背景 */
+      #particles-canvas {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: -1;
+        opacity: 0.3;
+      }
+
+      /* 玻璃材质通用样式 */
+      .glass {
+        background: var(--glass-bg);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid var(--glass-border);
+        border-radius: 20px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      }
+
+      /* 导航栏 */
+      nav {
+        position: fixed;
+        top: 0;
+        width: 100%;
+        z-index: 1000;
+        padding: 1rem 2rem;
+        background: rgba(10, 10, 10, 0.8);
+        backdrop-filter: blur(15px);
+        border-bottom: 1px solid var(--glass-border);
+        transition: all 0.3s ease;
+      }
+
+      nav.scrolled {
+        padding: 0.5rem 2rem;
+        background: rgba(10, 10, 10, 0.95);
+      }
+
+      .nav-content {
+        max-width: 1400px;
+        margin: 0 auto;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .logo {
+        font-size: 1.5rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, var(--primary-orange), #ff8c42);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        letter-spacing: -0.5px;
+      }
+
+      .nav-links {
+        display: flex;
+        gap: 2rem;
+        list-style: none;
+      }
+
+      .nav-links a {
+        color: var(--text-primary);
+        text-decoration: none;
+        font-weight: 500;
+        font-size: 0.9rem;
+        transition: color 0.3s ease;
+        position: relative;
+      }
+
+      .nav-links a::after {
+        content: "";
+        position: absolute;
+        bottom: -5px;
+        left: 0;
+        width: 0;
+        height: 2px;
+        background: var(--primary-orange);
+        transition: width 0.3s ease;
+      }
+
+      .nav-links a:hover::after {
+        width: 100%;
+      }
+
+      /* 英雄区域 */
+      .hero {
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .hero-content {
+        text-align: center;
+        z-index: 2;
+        transform: translateY(0);
+        transition: transform 0.1s ease-out;
+      }
+
+      .hero h1 {
+        font-size: clamp(3rem, 8vw, 6rem);
+        font-weight: 800;
+        margin-bottom: 1rem;
+        letter-spacing: -2px;
+        line-height: 1.1;
+        background: linear-gradient(135deg, #ffffff 0%, #b0b0b0 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .hero p {
+        font-size: 1.2rem;
+        color: var(--text-secondary);
+        margin-bottom: 2rem;
+        font-weight: 300;
+      }
+
+      .cta-button {
+        display: inline-block;
+        padding: 1rem 2.5rem;
+        background: var(--primary-orange);
+        color: white;
+        text-decoration: none;
+        border-radius: 50px;
+        font-weight: 600;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+        border: none;
+        cursor: pointer;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .cta-button::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          rgba(255, 255, 255, 0.3),
+          transparent
+        );
+        transition: left 0.5s ease;
+      }
+
+      .cta-button:hover::before {
+        left: 100%;
+      }
+
+      .cta-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 30px rgba(255, 105, 0, 0.4);
+      }
+
+      /* 滚动指示器 */
+      .scroll-indicator {
+        position: absolute;
+        bottom: 2rem;
+        left: 50%;
+        transform: translateX(-50%);
+        animation: bounce 2s infinite;
+        opacity: 0.6;
+      }
+
+      .scroll-indicator i {
+        font-size: 1.5rem;
+        color: var(--primary-orange);
+      }
+
+      @keyframes bounce {
+        0%,
+        20%,
+        50%,
+        80%,
+        100% {
+          transform: translateX(-50%) translateY(0);
+        }
+        40% {
+          transform: translateX(-50%) translateY(-10px);
+        }
+        60% {
+          transform: translateX(-50%) translateY(-5px);
+        }
+      }
+
+      /* 通用容器 */
+      .container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 0 2rem;
+      }
+
+      /* 章节样式 */
+      .section {
+        padding: 8rem 0;
+        position: relative;
+      }
+
+      .section-title {
+        font-size: clamp(2.5rem, 5vw, 4rem);
+        font-weight: 700;
+        margin-bottom: 1rem;
+        text-align: center;
+        letter-spacing: -1px;
+      }
+
+      .section-subtitle {
+        text-align: center;
+        color: var(--text-secondary);
+        font-size: 1.1rem;
+        margin-bottom: 4rem;
+        font-weight: 300;
+      }
+
+      /* 关于小米 - 玻璃卡片网格 */
+      .about-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 2rem;
+        margin-top: 3rem;
+      }
+
+      .glass-card {
+        padding: 2.5rem;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .glass-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(
+          135deg,
+          rgba(255, 105, 0, 0.1),
+          transparent
+        );
+        opacity: 0;
+        transition: opacity 0.4s ease;
+      }
+
+      .glass-card:hover {
+        transform: translateY(-10px) scale(1.02);
+        border-color: rgba(255, 105, 0, 0.3);
+        box-shadow: 0 20px 60px rgba(255, 105, 0, 0.2);
+      }
+
+      .glass-card:hover::before {
+        opacity: 1;
+      }
+
+      .glass-card i {
+        font-size: 2.5rem;
+        color: var(--primary-orange);
+        margin-bottom: 1.5rem;
+        display: block;
+      }
+
+      .glass-card h3 {
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+        font-weight: 600;
+      }
+
+      .glass-card p {
+        color: var(--text-secondary);
+        line-height: 1.7;
+        font-weight: 300;
+      }
+
+      /* 产品展示 - 3D卡片 */
+      .products-showcase {
+        perspective: 1000px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 2rem;
+        margin-top: 3rem;
+      }
+
+      .product-card {
+        height: 350px;
+        position: relative;
+        transform-style: preserve-3d;
+        transition: transform 0.6s ease;
+        cursor: pointer;
+      }
+
+      .product-card-inner {
+        width: 100%;
+        height: 100%;
+        position: relative;
+        transform-style: preserve-3d;
+        transition: transform 0.6s ease;
+      }
+
+      .product-card:hover .product-card-inner {
+        transform: rotateY(180deg);
+      }
+
+      .product-front,
+      .product-back {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        backface-visibility: hidden;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+      }
+
+      .product-front {
+        background: linear-gradient(
+          135deg,
+          rgba(255, 105, 0, 0.1),
+          rgba(255, 105, 0, 0.05)
+        );
+        border: 1px solid var(--glass-border);
+        border-radius: 20px;
+      }
+
+      .product-back {
+        background: linear-gradient(
+          135deg,
+          rgba(255, 105, 0, 0.2),
+          rgba(255, 105, 0, 0.1)
+        );
+        border: 1px solid var(--primary-orange);
+        border-radius: 20px;
+        transform: rotateY(180deg);
+      }
+
+      .product-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        color: var(--primary-orange);
+      }
+
+      .product-name {
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+      }
+
+      .product-desc {
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+        text-align: center;
+        line-height: 1.6;
+      }
+
+      .product-price {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: var(--primary-orange);
+        margin-top: 1rem;
+      }
+
+      /* 企业文化 - 视差滚动 */
+      .culture-section {
+        background: linear-gradient(
+          180deg,
+          transparent,
+          rgba(255, 105, 0, 0.03),
+          transparent
+        );
+        position: relative;
+        overflow: hidden;
+      }
+
+      .culture-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        gap: 2rem;
+        margin-top: 3rem;
+      }
+
+      .culture-card {
+        padding: 3rem;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .culture-card::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 3px;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          var(--primary-orange),
+          transparent
+        );
+        transform: scaleX(0);
+        transition: transform 0.6s ease;
+      }
+
+      .culture-card:hover::after {
+        transform: scaleX(1);
+      }
+
+      .culture-icon {
+        font-size: 3rem;
+        margin-bottom: 1.5rem;
+        background: linear-gradient(135deg, var(--primary-orange), #ff8c42);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .culture-title {
+        font-size: 1.3rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+      }
+
+      .culture-text {
+        color: var(--text-secondary);
+        line-height: 1.8;
+        font-weight: 300;
+      }
+
+      /* 数据统计 - 滚动动画 */
+      .stats-section {
+        background: rgba(255, 105, 0, 0.05);
+        border-top: 1px solid var(--glass-border);
+        border-bottom: 1px solid var(--glass-border);
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 3rem;
+        margin-top: 3rem;
+        text-align: center;
+      }
+
+      .stat-item {
+        opacity: 0;
+        transform: translateY(30px);
+        transition: all 0.6s ease;
+      }
+
+      .stat-item.visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .stat-number {
+        font-size: 3rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, var(--primary-orange), #ff8c42);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0.5rem;
+      }
+
+      .stat-label {
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 500;
+      }
+
+      /* 未来愿景 - 霓虹效果 */
+      .vision-section {
+        text-align: center;
+        position: relative;
+        padding: 10rem 0;
+      }
+
+      .vision-content {
+        max-width: 800px;
+        margin: 0 auto;
+        position: relative;
+        z-index: 2;
+      }
+
+      .vision-title {
+        font-size: clamp(2.5rem, 6vw, 4.5rem);
+        font-weight: 800;
+        margin-bottom: 2rem;
+        letter-spacing: -1px;
+        text-shadow: 0 0 30px rgba(255, 105, 0, 0.5);
+        animation: neon-glow 2s ease-in-out infinite alternate;
+      }
+
+      @keyframes neon-glow {
+        from {
+          text-shadow: 0 0 20px rgba(255, 105, 0, 0.5),
+            0 0 40px rgba(255, 105, 0, 0.3);
+        }
+        to {
+          text-shadow: 0 0 30px rgba(255, 105, 0, 0.8),
+            0 0 60px rgba(255, 105, 0, 0.5);
+        }
+      }
+
+      .vision-text {
+        font-size: 1.2rem;
+        color: var(--text-secondary);
+        line-height: 1.8;
+        font-weight: 300;
+        margin-bottom: 2rem;
+      }
+
+      /* 页脚 */
+      footer {
+        background: rgba(0, 0, 0, 0.8);
+        border-top: 1px solid var(--glass-border);
+        padding: 3rem 0;
+        text-align: center;
+      }
+
+      .footer-content {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+        align-items: center;
+      }
+
+      .social-links {
+        display: flex;
+        gap: 1.5rem;
+        font-size: 1.5rem;
+      }
+
+      .social-links a {
+        color: var(--text-secondary);
+        transition: all 0.3s ease;
+        display: inline-block;
+      }
+
+      .social-links a:hover {
+        color: var(--primary-orange);
+        transform: translateY(-3px) scale(1.1);
+      }
+
+      .copyright {
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+        font-weight: 300;
+      }
+
+      /* 滚动驱动的动画 - 关键帧 */
+      .reveal-on-scroll {
+        opacity: 0;
+        transform: translateY(50px);
+        transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      }
+
+      .reveal-on-scroll.revealed {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      /* 响应式设计 */
+      @media (max-width: 768px) {
+        .nav-links {
+          display: none;
+        }
+
+        .hero h1 {
+          font-size: 2.5rem;
+        }
+
+        .section {
+          padding: 4rem 0;
+        }
+
+        .about-grid,
+        .products-showcase,
+        .culture-grid,
+        .stats-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .glass-card,
+        .culture-card {
+          padding: 1.5rem;
+        }
+      }
+
+      /* 加载动画 */
+      .loader {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: var(--dark-bg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        transition: opacity 0.5s ease, visibility 0.5s ease;
+      }
+
+      .loader.hidden {
+        opacity: 0;
+        visibility: hidden;
+      }
+
+      .loader-spinner {
+        width: 50px;
+        height: 50px;
+        border: 3px solid rgba(255, 105, 0, 0.2);
+        border-top-color: var(--primary-orange);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* 浮动元素 */
+      .floating {
+        animation: float 6s ease-in-out infinite;
+      }
+
+      .floating-delayed {
+        animation: float 6s ease-in-out infinite;
+        animation-delay: 2s;
+      }
+
+      @keyframes float {
+        0%,
+        100% {
+          transform: translateY(0px);
+        }
+        50% {
+          transform: translateY(-20px);
+        }
+      }
+
+      /* 特效增强 */
+      .gradient-text {
+        background: linear-gradient(
+          135deg,
+          #ffffff 0%,
+          var(--primary-orange) 100%
+        );
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      /* 响应式调整 */
+      @media (max-width: 768px) {
+        .nav-links {
+          display: none;
+        }
+
+        .hero h1 {
+          font-size: 2.5rem;
+        }
+
+        .section {
+          padding: 4rem 0;
+        }
+
+        .about-grid,
+        .products-showcase,
+        .culture-grid,
+        .stats-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .glass-card,
+        .culture-card {
+          padding: 1.5rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- 加载器 -->
+    <div class="loader" id="loader">
+      <div class="loader-spinner"></div>
+    </div>
+
+    <!-- 粒子背景画布 -->
+    <canvas id="particles-canvas"></canvas>
+
+    <!-- 导航栏 -->
+    <nav id="navbar">
+      <div class="nav-content">
+        <div class="logo">XIAOMI</div>
+        <ul class="nav-links">
+          <li><a href="#about">关于</a></li>
+          <li><a href="#products">产品</a></li>
+          <li><a href="#culture">文化</a></li>
+          <li><a href="#stats">数据</a></li>
+          <li><a href="#vision">愿景</a></li>
+        </ul>
+      </div>
+    </nav>
+
+    <!-- 英雄区域 -->
+    <section class="hero">
+      <div class="hero-content" id="hero-content">
+        <h1>小米科技</h1>
+        <p>创新 · 品质 · 性价比 · 为发烧而生</p>
+        <a href="#about" class="cta-button">探索更多</a>
+      </div>
+      <div class="scroll-indicator">
+        <i class="fas fa-chevron-down"></i>
+      </div>
+    </section>
+
+    <!-- 关于小米 -->
+    <section class="section" id="about">
+      <div class="container">
+        <h2 class="section-title reveal-on-scroll">关于小米</h2>
+        <p class="section-subtitle reveal-on-scroll">
+          一家以手机、智能硬件和 IoT 平台为核心的互联网公司
+        </p>
+
+        <div class="about-grid">
+          <div class="glass glass-card reveal-on-scroll floating">
+            <i class="fas fa-rocket"></i>
+            <h3>创立初心</h3>
+            <p>
+              2010年4月，小米由雷军创办。坚持"为发烧而生"的理念，致力于让全球每个人都能享受科技带来的美好生活。
+            </p>
+          </div>
+
+          <div class="glass glass-card reveal-on-scroll floating-delayed">
+            <i class="fas fa-globe"></i>
+            <h3>全球布局</h3>
+            <p>
+              业务遍布全球100多个国家和地区，连续多年入选《财富》世界500强，是全球最具价值的科技品牌之一。
+            </p>
+          </div>
+
+          <div class="glass glass-card reveal-on-scroll">
+            <i class="fas fa-innovation"></i>
+            <h3>技术驱动</h3>
+            <p>
+              每年投入超百亿研发费用，拥有全球领先的专利储备，在5G、AI、IoT等领域持续创新突破。
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 产品展示 -->
+    <section class="section" id="products">
+      <div class="container">
+        <h2 class="section-title reveal-on-scroll">核心产品</h2>
+        <p class="section-subtitle reveal-on-scroll">构建全场景智能生活生态</p>
+
+        <div class="products-showcase">
+          <div class="product-card reveal-on-scroll">
+            <div class="product-card-inner">
+              <div class="product-front glass">
+                <i class="fas fa-mobile-alt product-icon"></i>
+                <div class="product-name">智能手机</div>
+                <div class="product-desc">旗舰性能 · 极致体验</div>
+              </div>
+              <div class="product-back glass">
+                <div class="product-name">小米 14 Ultra</div>
+                <div class="product-desc">徕卡影像 · 骁龙8 Gen3 · 2K超清屏</div>
+                <div class="product-price">¥6499</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="product-card reveal-on-scroll">
+            <div class="product-card-inner">
+              <div class="product-front glass">
+                <i class="fas fa-laptop product-icon"></i>
+                <div class="product-name">笔记本电脑</div>
+                <div class="product-desc">轻薄设计 · 强劲性能</div>
+              </div>
+              <div class="product-back glass">
+                <div class="product-name">小米 Book Pro</div>
+                <div class="product-desc">OLED屏幕 · 12代酷睿 · 超长续航</div>
+                <div class="product-price">¥5999</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="product-card reveal-on-scroll">
+            <div class="product-card-inner">
+              <div class="product-front glass">
+                <i class="fas fa-tv product-icon"></i>
+                <div class="product-name">智能电视</div>
+                <div class="product-desc">大屏体验 · AI语音</div>
+              </div>
+              <div class="product-back glass">
+                <div class="product-name">小米电视大师</div>
+                <div class="product-desc">8K分辨率 · 杜比视界 · 旗舰音质</div>
+                <div class="product-price">¥12999</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="product-card reveal-on-scroll">
+            <div class="product-card-inner">
+              <div class="product-front glass">
+                <i class="fas fa-robot product-icon"></i>
+                <div class="product-name">智能家居</div>
+                <div class="product-desc">全屋智能 · 一键控制</div>
+              </div>
+              <div class="product-back glass">
+                <div class="product-name">米家生态</div>
+                <div class="product-desc">500+款设备 · AIoT平台 · 无缝连接</div>
+                <div class="product-price">¥99起</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 企业文化 -->
+    <section class="section culture-section" id="culture">
+      <div class="container">
+        <h2 class="section-title reveal-on-scroll">企业文化</h2>
+        <p class="section-subtitle reveal-on-scroll">价值观驱动长期发展</p>
+
+        <div class="culture-grid">
+          <div class="glass culture-card reveal-on-scroll">
+            <i class="fas fa-heart culture-icon"></i>
+            <h3 class="culture-title">真诚热爱</h3>
+            <p class="culture-text">
+              对用户真诚，对产品热爱。我们相信只有真正热爱，才能做出让用户尖叫的产品。
+            </p>
+          </div>
+
+          <div class="glass culture-card reveal-on-scroll">
+            <i class="fas fa-users culture-icon"></i>
+            <h3 class="culture-title">用户为本</h3>
+            <p class="culture-text">
+              始终以用户为中心，倾听用户声音，回应用户期待，让每个人都享受科技的乐趣。
+            </p>
+          </div>
+
+          <div class="glass culture-card reveal-on-scroll">
+            <i class="fas fa-bolt culture-icon"></i>
+            <h3 class="culture-title">极致效率</h3>
+            <p class="culture-text">
+              用互联网思维改造传统产业，追求极致的运营效率，把利润留给用户。
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 数据统计 -->
+    <section class="section stats-section" id="stats">
+      <div class="container">
+        <h2 class="section-title reveal-on-scroll">数据见证实力</h2>
+        <p class="section-subtitle reveal-on-scroll">用数字说话，用结果证明</p>
+
+        <div class="stats-grid">
+          <div class="stat-item">
+            <div class="stat-number" data-target="500">0</div>
+            <div class="stat-label">全球排名</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-number" data-target="6">0</div>
+            <div class="stat-label">年入选500强</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-number" data-target="100">0</div>
+            <div class="stat-label">国家和地区</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-number" data-target="5000">0</div>
+            <div class="stat-label">万用户数</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 未来愿景 -->
+    <section class="section vision-section" id="vision">
+      <div class="container">
+        <div class="vision-content reveal-on-scroll">
+          <h2 class="vision-title">未来已来</h2>
+          <p class="vision-text">
+            小米将继续坚持"技术为本"的理念，在智能手机、AIoT、新能源汽车等领域持续创新。
+            我们致力于成为全球最硬核的科技公司，让全球每个人都能享受科技带来的美好生活。
+          </p>
+          <a href="#" class="cta-button">加入我们</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- 页脚 -->
+    <footer>
+      <div class="container">
+        <div class="footer-content">
+          <div class="social-links">
+            <a href="#"><i class="fab fa-weibo"></i></a>
+            <a href="#"><i class="fab fa-weixin"></i></a>
+            <a href="#"><i class="fab fa-twitter"></i></a>
+            <a href="#"><i class="fab fa-facebook"></i></a>
+            <a href="#"><i class="fab fa-instagram"></i></a>
+          </div>
+          <div class="copyright">
+            © 2024 Xiaomi Corporation. All rights reserved. | 为发烧而生
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <script>
+      // 页面加载完成后隐藏加载器
+      window.addEventListener("load", () => {
+        setTimeout(() => {
+          document.getElementById("loader").classList.add("hidden");
+        }, 500);
+      });
+
+      // 粒子背景系统
+      const canvas = document.getElementById("particles-canvas");
+      const ctx = canvas.getContext("2d");
+
+      let particles = [];
+      let animationId;
+
+      function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
+
+      class Particle {
+        constructor() {
+          this.x = Math.random() * canvas.width;
+          this.y = Math.random() * canvas.height;
+          this.size = Math.random() * 2 + 0.5;
+          this.speedX = (Math.random() - 0.5) * 0.5;
+          this.speedY = (Math.random() - 0.5) * 0.5;
+          this.opacity = Math.random() * 0.5 + 0.2;
+        }
+
+        update() {
+          this.x += this.speedX;
+          this.y += this.speedY;
+
+          if (this.x > canvas.width) this.x = 0;
+          if (this.x < 0) this.x = canvas.width;
+          if (this.y > canvas.height) this.y = 0;
+          if (this.y < 0) this.y = canvas.height;
+        }
+
+        draw() {
+          ctx.fillStyle = `rgba(255, 105, 0, ${this.opacity})`;
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      function initParticles() {
+        particles = [];
+        const particleCount = Math.min(
+          100,
+          Math.floor((canvas.width * canvas.height) / 15000)
+        );
+        for (let i = 0; i < particleCount; i++) {
+          particles.push(new Particle());
+        }
+      }
+
+      function animateParticles() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        particles.forEach((particle) => {
+          particle.update();
+          particle.draw();
+        });
+
+        // 连接临近粒子
+        for (let i = 0; i < particles.length; i++) {
+          for (let j = i + 1; j < particles.length; j++) {
+            const dx = particles[i].x - particles[j].x;
+            const dy = particles[i].y - particles[j].y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance < 100) {
+              ctx.strokeStyle = `rgba(255, 105, 0, ${
+                0.1 * (1 - distance / 100)
+              })`;
+              ctx.lineWidth = 0.5;
+              ctx.beginPath();
+              ctx.moveTo(particles[i].x, particles[i].y);
+              ctx.lineTo(particles[j].x, particles[j].y);
+              ctx.stroke();
+            }
+          }
+        }
+
+        animationId = requestAnimationFrame(animateParticles);
+      }
+
+      // 初始化粒子系统
+      resizeCanvas();
+      initParticles();
+      animateParticles();
+
+      window.addEventListener("resize", () => {
+        resizeCanvas();
+        initParticles();
+      });
+
+      // 导航栏滚动效果
+      const navbar = document.getElementById("navbar");
+      let lastScroll = 0;
+
+      window.addEventListener("scroll", () => {
+        const currentScroll = window.pageYOffset;
+
+        if (currentScroll > 100) {
+          navbar.classList.add("scrolled");
+        } else {
+          navbar.classList.remove("scrolled");
+        }
+
+        lastScroll = currentScroll;
+      });
+
+      // 英雄区域视差效果
+      const heroContent = document.getElementById("hero-content");
+
+      window.addEventListener("scroll", () => {
+        const scrolled = window.pageYOffset;
+        const heroHeight = document.querySelector(".hero").offsetHeight;
+
+        if (scrolled < heroHeight) {
+          const parallaxSpeed = 0.5;
+          heroContent.style.transform = `translateY(${
+            scrolled * parallaxSpeed
+          }px)`;
+          heroContent.style.opacity = 1 - scrolled / heroHeight;
+        }
+      });
+
+      // 滚动驱动的动画
+      const observerOptions = {
+        threshold: 0.1,
+        rootMargin: "0px 0px -50px 0px",
+      };
+
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("revealed");
+
+            // 特殊处理统计数字动画
+            if (entry.target.classList.contains("stat-item")) {
+              animateStatNumber(entry.target);
+            }
+          }
+        });
+      }, observerOptions);
+
+      // 观察所有需要动画的元素
+      document
+        .querySelectorAll(".reveal-on-scroll, .stat-item")
+        .forEach((el) => {
+          observer.observe(el);
+        });
+
+      // 统计数字动画
+      function animateStatNumber(element) {
+        const numberElement = element.querySelector(".stat-number");
+        if (!numberElement || numberElement.dataset.animated === "true") return;
+
+        const target = parseInt(numberElement.dataset.target);
+        const duration = 2000;
+        const step = target / (duration / 16);
+        let current = 0;
+
+        numberElement.dataset.animated = "true";
+
+        const timer = setInterval(() => {
+          current += step;
+          if (current >= target) {
+            current = target;
+            clearInterval(timer);
+          }
+          numberElement.textContent = Math.floor(current);
+        }, 16);
+      }
+
+      // 平滑滚动
+      document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
+        anchor.addEventListener("click", function (e) {
+          e.preventDefault();
+          const target = document.querySelector(this.getAttribute("href"));
+          if (target) {
+            target.scrollIntoView({
+              behavior: "smooth",
+              block: "start",
+            });
+          }
+        });
+      });
+
+      // 产品卡片3D效果增强
+      const productCards = document.querySelectorAll(".product-card");
+
+      productCards.forEach((card) => {
+        card.addEventListener("mousemove", (e) => {
+          const rect = card.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+
+          const centerX = rect.width / 2;
+          const centerY = rect.height / 2;
+
+          const rotateX = (y - centerY) / 10;
+          const rotateY = (centerX - x) / 10;
+
+          const inner = card.querySelector(".product-card-inner");
+          if (inner) {
+            inner.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.05)`;
+          }
+        });
+
+        card.addEventListener("mouseleave", () => {
+          const inner = card.querySelector(".product-card-inner");
+          if (inner) {
+            inner.style.transform = "";
+          }
+        });
+      });
+
+      // 玻璃卡片悬停效果增强
+      const glassCards = document.querySelectorAll(
+        ".glass-card, .culture-card"
+      );
+
+      glassCards.forEach((card) => {
+        card.addEventListener("mousemove", (e) => {
+          const rect = card.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+
+          const gradient = `radial-gradient(circle at ${x}px ${y}px, rgba(255, 105, 0, 0.15), transparent 70%)`;
+          card.style.background = gradient;
+        });
+
+        card.addEventListener("mouseleave", () => {
+          card.style.background = "";
+        });
+      });
+
+      // 页面可见性变化时暂停/恢复动画
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) {
+          cancelAnimationFrame(animationId);
+        } else {
+          animateParticles();
+        }
+      });
+
+      // 性能优化：节流函数
+      function throttle(func, limit) {
+        let inThrottle;
+        return function () {
+          const args = arguments;
+          const context = this;
+          if (!inThrottle) {
+            func.apply(context, args);
+            inThrottle = true;
+            setTimeout(() => (inThrottle = false), limit);
+          }
+        };
+      }
+
+      // 优化滚动事件
+      const optimizedScrollHandler = throttle(() => {
+        // 滚动相关的逻辑已在上面处理
+      }, 16);
+
+      window.addEventListener("scroll", optimizedScrollHandler);
+
+      // 添加键盘导航支持
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          // ESC键返回顶部
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+      });
+
+      // 控制台彩蛋
+      console.log(
+        "%c小米科技",
+        "font-size: 40px; font-weight: bold; background: linear-gradient(135deg, #FF6900, #ff8c42); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"
+      );
+      console.log(
+        "%c为发烧而生",
+        "font-size: 20px; color: #FF6900; font-weight: bold;"
+      );
+      console.log("%c欢迎来到小米的世界！", "font-size: 16px; color: #b0b0b0;");
+    </script>
+  </body>
+</html>
