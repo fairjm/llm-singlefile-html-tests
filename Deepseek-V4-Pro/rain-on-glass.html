@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rain on Glass Window</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background: #000;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: default;
+  }
+
+  canvas {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+
+  #controls {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(20, 24, 32, 0.75);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    padding: 10px 20px;
+    display: flex;
+    gap: 18px;
+    z-index: 10;
+    transition: opacity 0.4s;
+  }
+
+  #controls.idle {
+    opacity: 0.35;
+  }
+  #controls:hover, #controls:focus-within {
+    opacity: 1;
+  }
+
+  .control {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 64px;
+  }
+
+  .control label {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.6);
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+
+  .control input[type="range"] {
+    -webkit-appearance: none;
+    width: 80px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.25);
+    outline: none;
+    cursor: pointer;
+  }
+
+  .control input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #a0c4e8;
+    border: 2px solid rgba(255, 255, 255, 0.8);
+    cursor: pointer;
+    transition: transform 0.1s;
+  }
+
+  .control input[type="range"]::-webkit-slider-thumb:active {
+    transform: scale(1.2);
+  }
+
+  .control .val {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.7);
+    font-variant-numeric: tabular-nums;
+    font-family: 'SF Mono', 'Cascadia Code', monospace;
+  }
+
+  @media (max-width: 600px) {
+    #controls {
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 12px;
+    }
+    .control input[type="range"] {
+      width: 48px;
+    }
+  }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<div id="controls">
+  <div class="control">
+    <label>Wind Speed</label>
+    <input type="range" id="windSpeed" min="0" max="100" value="25" step="1">
+    <span class="val" id="windSpeedVal">25</span>
+  </div>
+  <div class="control">
+    <label>Wind Dir</label>
+    <input type="range" id="windDir" min="0" max="360" value="180" step="1">
+    <span class="val" id="windDirVal">180°</span>
+  </div>
+  <div class="control">
+    <label>Friction</label>
+    <input type="range" id="friction" min="5" max="100" value="45" step="1">
+    <span class="val" id="frictionVal">0.45</span>
+  </div>
+  <div class="control">
+    <label>Rain Rate</label>
+    <input type="range" id="rainRate" min="5" max="100" value="60" step="1">
+    <span class="val" id="rainRateVal">60</span>
+  </div>
+</div>
+
+<script>
+// ============================================================
+//  Rain on Glass Window — realistic physics simulation
+// ============================================================
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+// --- offscreen canvases ---
+let bgCanvas, bgCtx;
+let trailCanvas, trailCtx;
+
+let W, H;
+
+// --- config ---
+const params = {
+  windSpeed: 25,      // 0–100  (force magnitude)
+  windAngle: 180,     // 0–360 degrees, blowing direction (0=right)
+  friction: 0.45,     // 0.05–1.0
+  rainRate: 60,       // 5–100  (spawn probability per interval)
+};
+
+// --- physics constants ---
+const GRAVITY = 480;            // px/s²  gravitational acceleration on glass plane
+const SURFACE_TENSION_COEFF = 18; // resistance proportional to perimeter
+const DROP_MIN_RADIUS = 1.8;
+const DROP_MAX_RADIUS = 14;
+const STUCK_VELOCITY_THRESHOLD = 4; // px/s below which a drop is considered stuck
+
+// --- bokeh lights (pre-generated) ---
+let bokehLights = [];
+
+function generateBokeh() {
+  bokehLights = [];
+  const count = Math.floor((W * H) / 9000);
+  for (let i = 0; i < count; i++) {
+    const x = Math.random() * W;
+    const y = Math.random() * H;
+    const r = 1 + Math.random() * 7;
+    const hue = 25 + Math.random() * 40;
+    const sat = 40 + Math.random() * 50;
+    const light = 80 + Math.random() * 20;
+    const opacity = 0.15 + Math.random() * 0.5;
+    bokehLights.push({ x, y, r, hue, sat, light, opacity });
+  }
+}
+
+// ============================================================
+//  Raindrop
+// ============================================================
+class Raindrop {
+  constructor(x, y, radius) {
+    this.x = x;
+    this.y = y;
+    this.radius = radius;
+    this.vx = 0;
+    this.vy = 0;
+    this.alive = true;
+    this.mergeAnim = 0;       // 0–1, brief pulse after merging
+    this.trailTimer = 0;
+  }
+
+  get mass() {
+    // mass ∝ area on glass (volume in 3D projected to 2D)
+    return this.radius * this.radius;
+  }
+
+  get isStuck() {
+    const spd = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+    return spd < STUCK_VELOCITY_THRESHOLD && this.radius < this.staticThreshold();
+  }
+
+  // Critical radius above which a drop overcomes surface tension
+  staticThreshold() {
+    return (SURFACE_TENSION_COEFF / GRAVITY) * (1 + params.friction * 2.5);
+  }
+
+  update(dt) {
+    if (!this.alive) return;
+
+    this.mergeAnim = Math.max(0, this.mergeAnim - dt * 3);
+
+    const threshold = this.staticThreshold();
+    const spd = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+
+    // Determine if drop should move
+    const canMove = this.radius >= threshold || spd > STUCK_VELOCITY_THRESHOLD;
+
+    if (canMove) {
+      // Gravity along the glass plane (downward)
+      const Fgy = this.mass * GRAVITY;
+
+      // Wind force: proportional to drop's exposed cross-section (radius)
+      const windRad = params.windAngle * Math.PI / 180;
+      const windFx = params.windSpeed * 3.5 * this.radius * Math.cos(windRad);
+      const windFy = params.windSpeed * 3.5 * this.radius * Math.sin(windRad);
+
+      // Net force
+      const Fx = windFx;
+      const Fy = Fgy + windFy;
+
+      // Acceleration = F / mass
+      const ax = Fx / this.mass;
+      const ay = Fy / this.mass;
+
+      this.vx += ax * dt;
+      this.vy += ay * dt;
+
+      // Friction (opposes velocity)
+      const frictionForce = params.friction * GRAVITY; // proportional to normal
+      if (spd > 0.01) {
+        const frictionAx = -(this.vx / spd) * frictionForce;
+        const frictionAy = -(this.vy / spd) * frictionForce;
+        // Clamp: friction cannot reverse velocity
+        const newVx = this.vx + frictionAx * dt;
+        const newVy = this.vy + frictionAy * dt;
+        if (newVx * this.vx < 0) this.vx = 0; else this.vx = newVx;
+        if (newVy * this.vy < 0) this.vy = 0; else this.vy = newVy;
+      }
+
+      // Terminal velocity cap
+      const maxSpeed = 800;
+      const curSpeed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+      if (curSpeed > maxSpeed) {
+        const scale = maxSpeed / curSpeed;
+        this.vx *= scale;
+        this.vy *= scale;
+      }
+    } else {
+      // Stuck drop — very slight vibration from wind
+      if (params.windSpeed > 5) {
+        const microVib = params.windSpeed * 0.03 * Math.sin(performance.now() * 0.01 + this.x);
+        this.vx = microVib * Math.cos(params.windAngle * Math.PI / 180);
+        this.vy = microVib * Math.sin(params.windAngle * Math.PI / 180);
+      } else {
+        this.vx = 0;
+        this.vy = 0;
+      }
+    }
+
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+
+    // Boundary: keep on glass
+    this.x = Math.max(this.radius, Math.min(W - this.radius, this.x));
+
+    // Off bottom edge → remove
+    if (this.y - this.radius > H + 10) {
+      this.alive = false;
+      return;
+    }
+
+    // Off top edge (blown upward by wind) — clamp
+    if (this.y - this.radius < -10) {
+      this.y = -this.radius;
+    }
+
+    // Side edges — clamp
+    if (this.x - this.radius < 0) this.x = this.radius;
+    if (this.x + this.radius > W) this.x = W - this.radius;
+
+    // Record trail (only if moving meaningfully)
+    if (spd > 3) {
+      this.trailTimer += dt;
+      if (this.trailTimer > 0.025) {
+        this.trailTimer = 0;
+        this.paintTrail();
+      }
+    }
+  }
+
+  paintTrail() {
+    // Draw a small mark on the trail canvas
+    const alpha = Math.min(0.18, 0.04 + this.radius * 0.012);
+    trailCtx.beginPath();
+    trailCtx.arc(this.x, this.y, this.radius * 1.1, 0, Math.PI * 2);
+    trailCtx.fillStyle = `rgba(180, 200, 220, ${alpha})`;
+    trailCtx.fill();
+  }
+
+  draw(ctx) {
+    const { x, y, radius: r } = this;
+    // Merge animation: slight size pulse
+    const animR = r * (1 + this.mergeAnim * 0.18);
+
+    // Drop shadow/body
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, animR, 0, Math.PI * 2);
+
+    // Main gradient — simulates water lens on glass
+    const grad = ctx.createRadialGradient(
+      x - animR * 0.25, y - animR * 0.3, animR * 0.05,
+      x, y, animR
+    );
+    grad.addColorStop(0, 'rgba(230, 240, 255, 0.55)');    // bright core (lens focus)
+    grad.addColorStop(0.35, 'rgba(180, 200, 220, 0.35)'); // mid tone
+    grad.addColorStop(0.7, 'rgba(60, 80, 100, 0.45)');    // darker ring (refraction edge)
+    grad.addColorStop(0.9, 'rgba(30, 45, 60, 0.55)');     // outer shadow
+    grad.addColorStop(1, 'rgba(20, 30, 45, 0.65)');       // rim
+
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Specular highlight (light from above-left reflecting off the drop surface)
+    const hx = x - animR * 0.28;
+    const hy = y - animR * 0.32;
+    const hr = animR * 0.22;
+    const hGrad = ctx.createRadialGradient(hx, hy, 0, hx, hy, hr);
+    hGrad.addColorStop(0, 'rgba(255, 255, 255, 0.85)');
+    hGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.25)');
+    hGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.beginPath();
+    ctx.arc(hx, hy, hr, 0, Math.PI * 2);
+    ctx.fillStyle = hGrad;
+    ctx.fill();
+
+    // Bottom highlight (light refracted through the drop)
+    const bx = x + animR * 0.15;
+    const by = y + animR * 0.25;
+    const br = animR * 0.12;
+    const bGrad = ctx.createRadialGradient(bx, by, 0, bx, by, br);
+    bGrad.addColorStop(0, 'rgba(200, 220, 255, 0.4)');
+    bGrad.addColorStop(1, 'rgba(200, 220, 255, 0)');
+    ctx.beginPath();
+    ctx.arc(bx, by, br, 0, Math.PI * 2);
+    ctx.fillStyle = bGrad;
+    ctx.fill();
+
+    ctx.restore();
+  }
+}
+
+// ============================================================
+//  Simulation state
+// ============================================================
+let drops = [];
+let spawnAccum = 0;
+let lastTime = 0;
+
+// ============================================================
+//  Merge handling
+// ============================================================
+function handleMerges() {
+  // Sort by size descending — larger drops absorb smaller ones
+  drops.sort((a, b) => b.radius - a.radius);
+
+  for (let i = 0; i < drops.length; i++) {
+    if (!drops[i].alive) continue;
+    const A = drops[i];
+
+    for (let j = i + 1; j < drops.length; j++) {
+      if (!drops[j].alive) continue;
+      const B = drops[j];
+
+      const dx = A.x - B.x;
+      const dy = A.y - B.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist < A.radius + B.radius) {
+        // Merge B into A
+        const mA = A.mass;
+        const mB = B.mass;
+        const mTotal = mA + mB;
+
+        // New position: center of mass
+        A.x = (A.x * mA + B.x * mB) / mTotal;
+        A.y = (A.y * mA + B.y * mB) / mTotal;
+
+        // New velocity: conserve momentum
+        A.vx = (A.vx * mA + B.vx * mB) / mTotal;
+        A.vy = (A.vy * mA + B.vy * mB) / mTotal;
+
+        // New radius: preserve area (volume)
+        A.radius = Math.sqrt(mTotal);
+        A.radius = Math.min(DROP_MAX_RADIUS, A.radius);
+
+        // Merge animation pulse
+        A.mergeAnim = 1;
+
+        // After merging, the combined drop gets a speed boost
+        // (surface tension barrier broken → stored energy released)
+        const boostFactor = 1 + (B.radius / A.radius) * 0.6;
+        A.vx *= boostFactor;
+        A.vy *= boostFactor;
+
+        B.alive = false;
+      }
+    }
+  }
+
+  // Remove dead drops
+  drops = drops.filter(d => d.alive);
+}
+
+// ============================================================
+//  Spawn new raindrops
+// ============================================================
+function spawnDrop() {
+  const x = Math.random() * W;
+  const y = -Math.random() * 80; // start slightly above screen
+  // Vary drop sizes — most are small, occasional larger ones
+  const r = DROP_MIN_RADIUS + Math.random() * Math.random() * 5;
+  drops.push(new Raindrop(x, y, r));
+}
+
+function spawnLoop(dt) {
+  const rate = params.rainRate / 100; // 0.05 – 1.0
+  const avgInterval = 0.1 / (rate * rate + 0.04); // seconds between spawns
+  spawnAccum += dt;
+
+  while (spawnAccum >= avgInterval && drops.length < 350) {
+    spawnDrop();
+    spawnAccum -= avgInterval;
+  }
+}
+
+// ============================================================
+//  Background rendering
+// ============================================================
+function renderBackground() {
+  bgCtx.clearRect(0, 0, W, H);
+
+  // Sky gradient — deep night
+  const sky = bgCtx.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, '#0a0d14');
+  sky.addColorStop(0.5, '#121820');
+  sky.addColorStop(1, '#181e28');
+  bgCtx.fillStyle = sky;
+  bgCtx.fillRect(0, 0, W, H);
+
+  // Distant building silhouettes (bottom portion)
+  const buildingAreaHeight = H * 0.35;
+  const buildingTop = H - buildingAreaHeight;
+  bgCtx.fillStyle = '#0e1218';
+  bgCtx.fillRect(0, buildingTop, W, buildingAreaHeight);
+
+  // Generate simple building shapes (cached by seed)
+  const seed = 42;
+  let s = seed;
+  function pseudoRandom() {
+    s = (s * 16807 + 0) % 2147483647;
+    return (s - 1) / 2147483646;
+  }
+
+  let bx = 0;
+  while (bx < W) {
+    const bw = 18 + pseudoRandom() * 80;
+    const bh = pseudoRandom() * buildingAreaHeight * 0.8 + buildingAreaHeight * 0.15;
+    const by = H - bh;
+    bgCtx.fillStyle = `hsl(220, 8%, ${6 + pseudoRandom() * 6}%)`;
+    bgCtx.fillRect(bx, by, bw, bh);
+
+    // Windows (small warm lights)
+    const winSize = 2.5;
+    for (let wy = by + 6; wy < H - 6; wy += 10 + pseudoRandom() * 14) {
+      for (let wx = bx + 4; wx < bx + bw - 4; wx += 6 + pseudoRandom() * 10) {
+        if (pseudoRandom() < 0.45) {
+          const warm = `hsla(${30 + pseudoRandom() * 25}, ${60 + pseudoRandom() * 30}%, ${55 + pseudoRandom() * 40}%, ${0.3 + pseudoRandom() * 0.5})`;
+          bgCtx.fillStyle = warm;
+          bgCtx.fillRect(wx, wy, winSize, winSize);
+        }
+      }
+    }
+    bx += bw + pseudoRandom() * 4;
+  }
+
+  // Bokeh lights overlay
+  bokehLights.forEach(bl => {
+    const g = bgCtx.createRadialGradient(bl.x, bl.y, 0, bl.x, bl.y, bl.r);
+    g.addColorStop(0, `hsla(${bl.hue}, ${bl.sat}%, ${bl.light}%, ${bl.opacity})`);
+    g.addColorStop(0.6, `hsla(${bl.hue}, ${bl.sat}%, ${bl.light}%, ${bl.opacity * 0.3})`);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    bgCtx.beginPath();
+    bgCtx.arc(bl.x, bl.y, bl.r, 0, Math.PI * 2);
+    bgCtx.fillStyle = g;
+    bgCtx.fill();
+  });
+
+  // Vignette
+  const vignette = bgCtx.createRadialGradient(W / 2, H * 0.45, W * 0.45, W / 2, H * 0.45, W * 0.75);
+  vignette.addColorStop(0, 'rgba(0,0,0,0)');
+  vignette.addColorStop(1, 'rgba(0,0,0,0.55)');
+  bgCtx.fillStyle = vignette;
+  bgCtx.fillRect(0, 0, W, H);
+}
+
+// ============================================================
+//  Glass overlay
+// ============================================================
+function drawGlassOverlay() {
+  // Tint
+  ctx.fillStyle = 'rgba(120, 140, 165, 0.06)';
+  ctx.fillRect(0, 0, W, H);
+
+  // Subtle diagonal glare line
+  const glareGrad = ctx.createLinearGradient(0, 0, W * 0.7, H * 0.7);
+  glareGrad.addColorStop(0, 'rgba(255,255,255,0)');
+  glareGrad.addColorStop(0.48, 'rgba(255,255,255,0)');
+  glareGrad.addColorStop(0.5, 'rgba(255,255,255,0.04)');
+  glareGrad.addColorStop(0.52, 'rgba(255,255,255,0)');
+  glareGrad.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = glareGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Second fainter glare
+  const glare2 = ctx.createLinearGradient(W * 0.3, 0, W, H * 0.6);
+  glare2.addColorStop(0, 'rgba(255,255,255,0)');
+  glare2.addColorStop(0.49, 'rgba(255,255,255,0)');
+  glare2.addColorStop(0.5, 'rgba(255,255,255,0.025)');
+  glare2.addColorStop(0.51, 'rgba(255,255,255,0)');
+  glare2.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = glare2;
+  ctx.fillRect(0, 0, W, H);
+}
+
+// ============================================================
+//  Main render
+// ============================================================
+function render() {
+  // 1. Background
+  ctx.drawImage(bgCanvas, 0, 0);
+
+  // 2. Trail canvas (wet streaks — composite with 'lighter' for additive effect)
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighten';
+  ctx.drawImage(trailCanvas, 0, 0);
+  ctx.restore();
+
+  // 3. Glass overlay
+  drawGlassOverlay();
+
+  // 4. Drops (sorted by y for depth ordering)
+  const sorted = [...drops].sort((a, b) => a.y - b.y);
+  sorted.forEach(d => d.draw(ctx));
+}
+
+// ============================================================
+//  Trail canvas maintenance
+// ============================================================
+function fadeTrails() {
+  // Slowly fade existing trails (water evaporates)
+  trailCtx.fillStyle = `rgba(0, 0, 0, ${0.015 + (1 - params.friction) * 0.025})`;
+  trailCtx.fillRect(0, 0, W, H);
+}
+
+// ============================================================
+//  Animation loop
+// ============================================================
+function loop(timestamp) {
+  if (!lastTime) lastTime = timestamp;
+  let dt = (timestamp - lastTime) / 1000;
+  lastTime = timestamp;
+
+  // Clamp dt to avoid spiral of death
+  if (dt > 0.1) dt = 0.1;
+  if (dt <= 0) dt = 0.016;
+
+  // Spawn new drops
+  spawnLoop(dt);
+
+  // Update drops
+  drops.forEach(d => d.update(dt));
+
+  // Handle merges
+  handleMerges();
+
+  // Fade trail canvas
+  fadeTrails();
+
+  // Render everything
+  render();
+
+  requestAnimationFrame(loop);
+}
+
+// ============================================================
+//  Resize
+// ============================================================
+function resize() {
+  W = window.innerWidth;
+  H = window.innerHeight;
+
+  const dpr = Math.min(window.devicePixelRatio || 1, 2); // cap at 2x for perf
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  // Recreate offscreen canvases
+  bgCanvas = document.createElement('canvas');
+  bgCanvas.width = W * dpr;
+  bgCanvas.height = H * dpr;
+  bgCtx = bgCanvas.getContext('2d');
+  bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  trailCanvas = document.createElement('canvas');
+  trailCanvas.width = W * dpr;
+  trailCanvas.height = H * dpr;
+  trailCtx = trailCanvas.getContext('2d');
+  trailCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  generateBokeh();
+  renderBackground();
+}
+
+// ============================================================
+//  UI Bindings
+// ============================================================
+function bindSlider(id, paramKey, format) {
+  const slider = document.getElementById(id);
+  const display = document.getElementById(id + 'Val');
+
+  slider.addEventListener('input', () => {
+    const raw = parseFloat(slider.value);
+    // Map raw slider value to actual param value
+    if (paramKey === 'friction') {
+      params[paramKey] = raw / 100;
+    } else {
+      params[paramKey] = raw;
+    }
+    // Update label display
+    if (display) {
+      display.textContent = format ? format(raw) : raw;
+    }
+  });
+}
+
+function setupUI() {
+  bindSlider('windSpeed', 'windSpeed', null);
+  bindSlider('windDir', 'windAngle', v => Math.round(v) + '°');
+  bindSlider('friction', 'friction', v => (v / 100).toFixed(2));
+  bindSlider('rainRate', 'rainRate', null);
+
+  // Auto-hide controls after inactivity
+  const controls = document.getElementById('controls');
+  let idleTimer;
+  function showControls() {
+    controls.classList.remove('idle');
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => controls.classList.add('idle'), 3000);
+  }
+  controls.addEventListener('pointermove', showControls);
+  controls.addEventListener('input', showControls);
+  showControls();
+}
+
+// ============================================================
+//  Init
+// ============================================================
+function init() {
+  resize();
+  setupUI();
+
+  // Pre-populate with a few drops so it's not completely dry
+  for (let i = 0; i < 8; i++) {
+    const x = Math.random() * W;
+    const y = Math.random() * H;
+    const r = DROP_MIN_RADIUS + Math.random() * 3;
+    drops.push(new Raindrop(x, y, r));
+  }
+
+  window.addEventListener('resize', () => {
+    resize();
+    // Re-generate trails (they get cleared)
+    trailCtx.clearRect(0, 0, trailCanvas.width, trailCanvas.height);
+  });
+
+  requestAnimationFrame(loop);
+}
+
+init();
+</script>
+</body>
+</html>

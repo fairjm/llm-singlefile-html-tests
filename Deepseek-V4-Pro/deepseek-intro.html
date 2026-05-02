@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepSeek — 探索智能的无限可能</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>🐳</text></svg>">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+/* ── Reset & Base ── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scrollbar-width:thin;scrollbar-color:#1e3a5f transparent}
+body{font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;background:#020b1a;color:#e0e8f0;overflow-x:hidden;line-height:1.6}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#0ff,#7b2ff7);border-radius:3px}
+
+/* ── 3D Canvas ── */
+#particle-bg{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.6}
+
+/* ── Glass utility ── */
+.glass{background:rgba(255,255,255,0.03);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.08);border-radius:20px}
+.glass-strong{background:rgba(255,255,255,0.06);backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px);border:1px solid rgba(255,255,255,0.12);border-radius:24px}
+
+/* ── Gradient text ── */
+.gradient-text{background:linear-gradient(135deg,#00d4ff 0%,#7b2ff7 50%,#ff3cac 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+
+/* ── Nav ── */
+nav{position:fixed;top:0;left:0;right:0;z-index:1000;padding:16px 32px;display:flex;align-items:center;justify-content:space-between;transition:all 0.4s cubic-bezier(0.16,1,0.3,1)}
+nav.scrolled{background:rgba(2,11,26,0.85);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,0.06);padding:10px 32px}
+.nav-logo{font-size:1.5rem;font-weight:800;letter-spacing:-0.02em;color:#fff;text-decoration:none;display:flex;align-items:center;gap:8px}
+.nav-logo .dot{width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,#00d4ff,#7b2ff7);box-shadow:0 0 20px rgba(0,212,255,0.6)}
+.nav-links{display:flex;gap:32px;list-style:none}
+.nav-links a{color:#8899aa;text-decoration:none;font-size:0.9rem;font-weight:500;transition:color 0.3s;letter-spacing:0.01em}
+.nav-links a:hover{color:#fff}
+
+/* ── Hero ── */
+.hero{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 24px}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:100px;font-size:0.8rem;font-weight:500;color:#00d4ff;border:1px solid rgba(0,212,255,0.25);background:rgba(0,212,255,0.05);margin-bottom:32px;animation:fadeInUp 0.8s ease-out}
+.hero-badge .pulse{width:7px;height:7px;border-radius:50%;background:#00d4ff;box-shadow:0 0 12px #00d4ff;animation:pulse 2s infinite}
+.hero h1{font-size:clamp(3rem,8vw,6.5rem);font-weight:900;letter-spacing:-0.03em;line-height:1.05;margin-bottom:24px;animation:fadeInUp 0.8s 0.1s ease-out both}
+.hero p{font-size:clamp(1rem,2vw,1.25rem);color:#8899aa;max-width:600px;margin-bottom:48px;animation:fadeInUp 0.8s 0.2s ease-out both}
+.hero-buttons{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;animation:fadeInUp 0.8s 0.3s ease-out both}
+.btn{padding:14px 32px;border-radius:100px;font-weight:600;font-size:0.95rem;text-decoration:none;transition:all 0.35s cubic-bezier(0.16,1,0.3,1);cursor:pointer;border:none}
+.btn-primary{background:linear-gradient(135deg,#00d4ff,#7b2ff7);color:#fff;box-shadow:0 4px 30px rgba(0,212,255,0.3)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 40px rgba(123,47,247,0.5)}
+.btn-ghost{background:rgba(255,255,255,0.05);color:#e0e8f0;border:1px solid rgba(255,255,255,0.15)}
+.btn-ghost:hover{background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.3);transform:translateY(-2px)}
+
+/* ── Scroll indicator ── */
+.scroll-indicator{position:absolute;bottom:40px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:8px;animation:fadeInUp 0.8s 0.6s ease-out both}
+.scroll-indicator span{font-size:0.7rem;letter-spacing:0.15em;color:#556677;text-transform:uppercase}
+.scroll-indicator .line{width:1px;height:40px;background:linear-gradient(to bottom,#00d4ff,transparent);animation:scrollPulse 2s infinite}
+
+/* ── Sections ── */
+section{position:relative;z-index:1;padding:120px 24px;max-width:1200px;margin:0 auto}
+.section-header{text-align:center;margin-bottom:80px}
+.section-header h2{font-size:clamp(2rem,4vw,3.2rem);font-weight:800;letter-spacing:-0.02em;margin-bottom:16px}
+.section-header p{color:#667788;font-size:1.1rem;max-width:500px;margin:0 auto}
+
+/* ── Stats grid ── */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:24px}
+.stat-card{text-align:center;padding:40px 24px;transition:transform 0.4s cubic-bezier(0.16,1,0.3,1)}
+.stat-card:hover{transform:translateY(-8px);border-color:rgba(0,212,255,0.3)}
+.stat-number{font-size:3rem;font-weight:900;letter-spacing:-0.02em;margin-bottom:8px}
+.stat-label{color:#667788;font-size:0.9rem;font-weight:500}
+
+/* ── Model Cards ── */
+.model-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:24px}
+.model-card{overflow:hidden;transition:all 0.4s cubic-bezier(0.16,1,0.3,1);position:relative}
+.model-card:hover{transform:translateY(-8px);border-color:rgba(0,212,255,0.25);box-shadow:0 20px 60px rgba(0,0,0,0.5),0 0 40px rgba(0,212,255,0.05)}
+.model-card::after{content:'';position:absolute;inset:0;background:radial-gradient(circle at top right,rgba(0,212,255,0.08),transparent 60%);pointer-events:none}
+.model-card .card-body{padding:36px 28px;position:relative;z-index:1}
+.model-card .card-icon{font-size:2rem;margin-bottom:16px;display:block}
+.model-card h3{font-size:1.4rem;font-weight:700;margin-bottom:8px;letter-spacing:-0.01em}
+.model-card .tag{display:inline-block;padding:4px 12px;border-radius:100px;font-size:0.75rem;font-weight:600;margin-bottom:16px;background:rgba(0,212,255,0.1);color:#00d4ff;border:1px solid rgba(0,212,255,0.2)}
+.model-card p{color:#8899aa;font-size:0.92rem;line-height:1.7}
+.model-card .specs{display:flex;gap:16px;margin-top:20px;flex-wrap:wrap}
+.model-card .spec{font-size:0.78rem;color:#667788;padding:6px 14px;border-radius:100px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06)}
+
+/* ── Feature grid ── */
+.feature-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
+.feature-card{padding:32px 28px;transition:all 0.4s cubic-bezier(0.16,1,0.3,1)}
+.feature-card:hover{transform:translateY(-4px);border-color:rgba(123,47,247,0.25)}
+.feature-icon{width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:14px;margin-bottom:20px;font-size:1.4rem;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08)}
+.feature-card h4{font-size:1.05rem;font-weight:700;margin-bottom:8px;letter-spacing:-0.01em}
+.feature-card p{color:#8899aa;font-size:0.88rem;line-height:1.7}
+
+/* ── Benchmark table ── */
+.bench-card{overflow-x:auto;padding:8px}
+.bench-card table{width:100%;border-collapse:collapse;font-size:0.9rem}
+.bench-card th{padding:16px 20px;text-align:left;color:#667788;font-weight:600;font-size:0.8rem;letter-spacing:0.05em;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,0.08)}
+.bench-card td{padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.04);color:#c0c8d0}
+.bench-card tr:hover td{background:rgba(255,255,255,0.02)}
+.bench-card .highlight{color:#00d4ff;font-weight:700}
+.bench-card .bar-wrap{display:flex;align-items:center;gap:10px}
+.bench-card .bar{flex:1;height:6px;border-radius:3px;background:rgba(255,255,255,0.06);overflow:hidden}
+.bench-card .bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,#00d4ff,#7b2ff7);transition:width 1.5s cubic-bezier(0.16,1,0.3,1)}
+
+/* ── Philosophy / CTA ── */
+.philosophy-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
+.philosophy-card{text-align:center;padding:40px 28px;transition:all 0.4s cubic-bezier(0.16,1,0.3,1)}
+.philosophy-card:hover{transform:translateY(-4px);border-color:rgba(255,255,255,0.15)}
+.philosophy-card .ph-icon{font-size:2.8rem;margin-bottom:20px;display:block}
+.philosophy-card h4{font-size:1.1rem;font-weight:700;margin-bottom:8px}
+
+.cta-section{text-align:center;padding:120px 24px}
+.cta-section h2{font-size:clamp(2rem,4.5vw,3.5rem);font-weight:900;letter-spacing:-0.02em;margin-bottom:20px;line-height:1.2}
+.cta-section p{color:#667788;font-size:1.1rem;max-width:500px;margin:0 auto 40px}
+
+/* ── Footer ── */
+footer{position:relative;z-index:1;padding:60px 32px;text-align:center;border-top:1px solid rgba(255,255,255,0.05)}
+footer p{color:#556677;font-size:0.85rem}
+footer .heart{color:#ff3cac}
+
+/* ── Animations ── */
+@keyframes fadeInUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 12px #00d4ff}50%{opacity:0.4;box-shadow:0 0 4px #00d4ff}}
+@keyframes scrollPulse{0%,100%{opacity:0.3}50%{opacity:1}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+
+/* ── Reveal on scroll ── */
+.reveal{opacity:0;transform:translateY(40px);transition:opacity 0.8s cubic-bezier(0.16,1,0.3,1),transform 0.8s cubic-bezier(0.16,1,0.3,1)}
+.reveal.visible{opacity:1;transform:translateY(0)}
+
+/* ── Parallax decorative elements ── */
+.decoration{position:absolute;pointer-events:none;z-index:0}
+.decoration.orb{width:400px;height:400px;border-radius:50%;filter:blur(120px);opacity:0.08}
+.decoration.orb-pink{background:#ff3cac;top:20%;right:-10%}
+.decoration.orb-blue{background:#00d4ff;bottom:10%;left:-8%}
+.decoration.orb-purple{background:#7b2ff7;top:60%;right:20%}
+
+/* ── Responsive ── */
+@media(max-width:768px){
+  .nav-links{display:none}
+  nav{padding:12px 20px}
+  section{padding:80px 20px}
+  .model-grid{grid-template-columns:1fr}
+  .hero-buttons{flex-direction:column;align-items:center}
+}
+</style>
+</head>
+<body>
+
+<!-- Three.js Particle Background -->
+<canvas id="particle-bg"></canvas>
+
+<!-- Decorative orbs -->
+<div class="decoration orb orb-pink"></div>
+<div class="decoration orb orb-blue"></div>
+<div class="decoration orb orb-purple"></div>
+
+<!-- Navigation -->
+<nav id="navbar">
+  <a href="#" class="nav-logo">
+    <span class="dot"></span> DeepSeek
+  </a>
+  <ul class="nav-links">
+    <li><a href="#about">关于</a></li>
+    <li><a href="#models">模型</a></li>
+    <li><a href="#features">特性</a></li>
+    <li><a href="#benchmarks">基准</a></li>
+    <li><a href="#philosophy">理念</a></li>
+  </ul>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-badge">
+    <span class="pulse"></span> 最新发布：DeepSeek-V4 Pro
+  </div>
+  <h1>探索智能的<br><span class="gradient-text">无限可能</span></h1>
+  <p>DeepSeek 致力于打造通用人工智能的前沿模型，以开放的姿态推动 AI 技术的民主化进程。</p>
+  <div class="hero-buttons">
+    <a href="#" class="btn btn-primary">开始使用</a>
+    <a href="#" class="btn btn-ghost">查看文档 →</a>
+  </div>
+  <div class="scroll-indicator">
+    <span>Scroll</span>
+    <div class="line"></div>
+  </div>
+</section>
+
+<!-- Stats -->
+<section id="about">
+  <div class="stats-grid">
+    <div class="stat-card glass reveal">
+      <div class="stat-number gradient-text">128K</div>
+      <div class="stat-label">最大上下文窗口</div>
+    </div>
+    <div class="stat-card glass reveal">
+      <div class="stat-number gradient-text">685B</div>
+      <div class="stat-label">MoE 总参数量</div>
+    </div>
+    <div class="stat-card glass reveal">
+      <div class="stat-number gradient-text">37B</div>
+      <div class="stat-label">每 Token 激活参数</div>
+    </div>
+    <div class="stat-card glass reveal">
+      <div class="stat-number gradient-text">100+</div>
+      <div class="stat-label">支持语言</div>
+    </div>
+  </div>
+</section>
+
+<!-- Models -->
+<section id="models">
+  <div class="section-header reveal">
+    <h2>模型<span class="gradient-text">矩阵</span></h2>
+    <p>覆盖从轻量端侧到旗舰级推理的全场景模型家族</p>
+  </div>
+  <div class="model-grid">
+    <div class="model-card glass reveal">
+      <div class="card-body">
+        <span class="card-icon">🧠</span>
+        <h3>DeepSeek-V4 Pro</h3>
+        <span class="tag">旗舰模型</span>
+        <p>最新一代通用大语言模型，基于革新性 MoE 架构，在推理、编程、数学与多模态理解上达到顶尖水平。</p>
+        <div class="specs">
+          <span class="spec">685B MoE</span>
+          <span class="spec">128K 上下文</span>
+          <span class="spec">多模态</span>
+          <span class="spec">2025.04</span>
+        </div>
+      </div>
+    </div>
+    <div class="model-card glass reveal">
+      <div class="card-body">
+        <span class="card-icon">⚡</span>
+        <h3>DeepSeek-R1</h3>
+        <span class="tag">推理专精</span>
+        <p>专为复杂推理任务设计的模型，通过强化学习驱动的思维链推理，在数学竞赛和编程挑战中表现卓越。</p>
+        <div class="specs">
+          <span class="spec">长思维链</span>
+          <span class="spec">CoT 推理</span>
+          <span class="spec">RL 训练</span>
+          <span class="spec">2025.01</span>
+        </div>
+      </div>
+    </div>
+    <div class="model-card glass reveal">
+      <div class="card-body">
+        <span class="card-icon">💎</span>
+        <h3>DeepSeek-V3</h3>
+        <span class="tag">高效旗舰</span>
+        <p>采用 Multi-Token Prediction 等创新技术，在保持顶尖性能的同时大幅降低推理成本，重新定义了性价比标准。</p>
+        <div class="specs">
+          <span class="spec">671B MoE</span>
+          <span class="spec">MTP</span>
+          <span class="spec">FP8 训练</span>
+          <span class="spec">2024.12</span>
+        </div>
+      </div>
+    </div>
+    <div class="model-card glass reveal">
+      <div class="card-body">
+        <span class="card-icon">🪶</span>
+        <h3>DeepSeek-MoE</h3>
+        <span class="tag">轻量系列</span>
+        <p>面向端侧部署的高效模型，通过细粒度 MoE 架构在有限算力下仍能提供出色的语言理解和生成能力。</p>
+        <div class="specs">
+          <span class="spec">16B</span>
+          <span class="spec">端侧可部署</span>
+          <span class="spec">开源</span>
+          <span class="spec">2024</span>
+        </div>
+      </div>
+    </div>
+    <div class="model-card glass reveal">
+      <div class="card-body">
+        <span class="card-icon">👁️</span>
+        <h3>DeepSeek-VL2</h3>
+        <span class="tag">多模态</span>
+        <p>视觉语言模型系列，在文档理解、图表解析和视觉推理等任务上表现出色，支持动态分辨率输入。</p>
+        <div class="specs">
+          <span class="spec">动态分辨率</span>
+          <span class="spec">多尺寸</span>
+          <span class="spec">开源</span>
+          <span class="spec">2024.12</span>
+        </div>
+      </div>
+    </div>
+    <div class="model-card glass reveal">
+      <div class="card-body">
+        <span class="card-icon">🎵</span>
+        <h3>DeepSeek-Coder</h3>
+        <span class="tag">代码专精</span>
+        <p>专注代码生成与理解的编程模型，在 HumanEval、MBPP 等基准上名列前茅，支持 338 种编程语言。</p>
+        <div class="specs">
+          <span class="spec">338 语言</span>
+          <span class="spec">FIM 补全</span>
+          <span class="spec">开源</span>
+          <span class="spec">2024</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section id="features">
+  <div class="section-header reveal">
+    <h2>技术<span class="gradient-text">创新</span></h2>
+    <p>持续推动大语言模型技术边界的核心突破</p>
+  </div>
+  <div class="feature-grid">
+    <div class="feature-card glass reveal">
+      <div class="feature-icon">🔀</div>
+      <h4>混合专家架构 (MoE)</h4>
+      <p>创新的细粒度 MoE 架构，单次推理仅激活部分参数，实现算力与性能的最优平衡。支持动态路由，让每个 token 找到最合适的专家网络。</p>
+    </div>
+    <div class="feature-card glass reveal">
+      <div class="feature-icon">🔗</div>
+      <h4>多头潜在注意力 (MLA)</h4>
+      <p>自研注意力机制，通过低秩键值压缩大幅降低推理时的 KV 缓存开销，在长序列场景中内存占用和吞吐量显著优于传统 MHA。</p>
+    </div>
+    <div class="feature-card glass reveal">
+      <div class="feature-icon">🎯</div>
+      <h4>多 Token 预测 (MTP)</h4>
+      <p>突破传统单 token 预测范式，一次前向传播同时预测多个未来 token，显著提升训练效率和生成质量。</p>
+    </div>
+    <div class="feature-card glass reveal">
+      <div class="feature-icon">🔬</div>
+      <h4>强化学习推理</h4>
+      <p>基于 GRPO 算法的大规模强化学习训练，让模型自主涌现出思维链推理能力，无需人工标注中间步骤。</p>
+    </div>
+    <div class="feature-card glass reveal">
+      <div class="feature-icon">📊</div>
+      <h4>FP8 混合精度训练</h4>
+      <p>在超大规模训练中率先验证 FP8 精度可行性，在保持模型质量的同时大幅降低训练算力需求和能源消耗。</p>
+    </div>
+    <div class="feature-card glass reveal">
+      <div class="feature-icon">🌍</div>
+      <h4>开源与生态</h4>
+      <p>全系列模型采用 MIT 许可开源发布，提供完整的权重、代码和技术报告，推动全球 AI 社区的协同创新。</p>
+    </div>
+  </div>
+</section>
+
+<!-- Benchmarks -->
+<section id="benchmarks">
+  <div class="section-header reveal">
+    <h2>性能<span class="gradient-text">基准</span></h2>
+    <p>在权威评测中与国际顶尖模型的对标表现</p>
+  </div>
+  <div class="bench-card glass-strong reveal" style="max-width:800px;margin:0 auto">
+    <table>
+      <thead>
+        <tr><th>基准测试</th><th>任务类型</th><th>DeepSeek-V4</th><th>对比</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>MMLU</strong></td><td>综合知识</td><td class="highlight">91.2</td>
+          <td>
+            <div class="bar-wrap">
+              <div class="bar"><div class="bar-fill reveal-bar" style="width:91.2%"></div></div>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>HumanEval</strong></td><td>代码生成</td><td class="highlight">93.4</td>
+          <td>
+            <div class="bar-wrap">
+              <div class="bar"><div class="bar-fill reveal-bar" style="width:93.4%"></div></div>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>MATH-500</strong></td><td>数学推理</td><td class="highlight">96.8</td>
+          <td>
+            <div class="bar-wrap">
+              <div class="bar"><div class="bar-fill reveal-bar" style="width:96.8%"></div></div>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>GPQA Diamond</strong></td><td>研究生级 QA</td><td class="highlight">73.1</td>
+          <td>
+            <div class="bar-wrap">
+              <div class="bar"><div class="bar-fill reveal-bar" style="width:73.1%"></div></div>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>LiveCodeBench</strong></td><td>编程竞赛</td><td class="highlight">67.9</td>
+          <td>
+            <div class="bar-wrap">
+              <div class="bar"><div class="bar-fill reveal-bar" style="width:67.9%"></div></div>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>SWE-bench</strong></td><td>软件工程</td><td class="highlight">54.2</td>
+          <td>
+            <div class="bar-wrap">
+              <div class="bar"><div class="bar-fill reveal-bar" style="width:54.2%"></div></div>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- Philosophy -->
+<section id="philosophy">
+  <div class="section-header reveal">
+    <h2>我们的<span class="gradient-text">理念</span></h2>
+    <p>驱动 DeepSeek 不断前行的核心价值观</p>
+  </div>
+  <div class="philosophy-grid">
+    <div class="philosophy-card glass reveal">
+      <span class="ph-icon">🔓</span>
+      <h4>全面开放</h4>
+      <p>坚信开放科学是 AGI 的正确路径，所有模型权重、训练细节和技术报告面向全球社区公开。</p>
+    </div>
+    <div class="philosophy-card glass reveal">
+      <span class="ph-icon">⚡</span>
+      <h4>极致效率</h4>
+      <p>以算法创新替代算力堆砌，通过架构设计实现数倍的训练和推理效率提升，让尖端 AI 触手可及。</p>
+    </div>
+    <div class="philosophy-card glass reveal">
+      <span class="ph-icon">🌱</span>
+      <h4>长期主义</h4>
+      <p>专注 AGI 长期目标而非短期商业利益，持续投入基础研究，探索智能的本质与边界。</p>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<div class="cta-section reveal">
+  <h2>准备好探索<br><span class="gradient-text">智能的下一站</span>了吗？</h2>
+  <p>访问 DeepSeek 官网开始使用我们最新的模型服务。</p>
+  <a href="#" class="btn btn-primary" style="font-size:1.05rem;padding:16px 40px">立即开始 →</a>
+</div>
+
+<!-- Footer -->
+<footer>
+  <p>Made with <span class="heart">❤</span> · DeepSeek 致力于推动 AI 技术的民主化 · &copy; 2025</p>
+</footer>
+
+<script>
+/* ── Three.js particle network ── */
+(function(){
+  const canvas = document.getElementById('particle-bg');
+  const renderer = new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.setSize(window.innerWidth,window.innerHeight);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(60,window.innerWidth/window.innerHeight,0.1,100);
+  camera.position.z = 30;
+
+  // Particles
+  const count = 400;
+  const positions = new Float32Array(count*3);
+  const colors = new Float32Array(count*3);
+  for(let i=0;i<count;i++){
+    positions[i*3]=(Math.random()-0.5)*50;
+    positions[i*3+1]=(Math.random()-0.5)*40;
+    positions[i*3+2]=(Math.random()-0.5)*20;
+    // Blue/cyan to purple gradient
+    const t=Math.random();
+    colors[i*3]=0.0+t*0.3;      // R
+    colors[i*3+1]=0.5+t*0.3;    // G
+    colors[i*3+2]=0.7+t*0.3;    // B
+  }
+  const geom=new THREE.BufferGeometry();
+  geom.setAttribute('position',new THREE.BufferAttribute(positions,3));
+  geom.setAttribute('color',new THREE.BufferAttribute(colors,3));
+  const mat=new THREE.PointsMaterial({size:0.06,vertexColors:true,transparent:true,opacity:0.7,blending:THREE.AdditiveBlending,depthWrite:false});
+  const points=new THREE.Points(geom,mat);
+  scene.add(points);
+
+  // Lines between close particles (build edges on the fly for performance)
+  const lineGeom=new THREE.BufferGeometry();
+  const lineMat=new THREE.LineBasicMaterial({color:0x00d4ff,transparent:true,opacity:0.08,blending:THREE.AdditiveBlending,depthWrite:false});
+  const lines=new THREE.LineSegments(lineGeom,lineMat);
+  scene.add(lines);
+
+  function updateLines(){
+    const pos=points.geometry.attributes.position.array;
+    const linePositions=[];
+    const threshold=5.5;
+    for(let i=0;i<count;i++){
+      for(let j=i+1;j<count;j++){
+        const dx=pos[i*3]-pos[j*3];
+        const dy=pos[i*3+1]-pos[j*3+1];
+        const dz=pos[i*3+2]-pos[j*3+2];
+        const dist=Math.sqrt(dx*dx+dy*dy+dz*dz);
+        if(dist<threshold){
+          linePositions.push(pos[i*3],pos[i*3+1],pos[i*3+2],pos[j*3],pos[j*3+1],pos[j*3+2]);
+        }
+      }
+    }
+    lineGeom.setAttribute('position',new THREE.BufferAttribute(new Float32Array(linePositions),3));
+  }
+  updateLines();
+
+  // Mouse interaction
+  let mouseX=0,mouseY=0,targetX=0,targetY=0;
+  window.addEventListener('mousemove',e=>{
+    targetX=(e.clientX/window.innerWidth-0.5)*3;
+    targetY=(e.clientY/window.innerHeight-0.5)*2;
+  });
+
+  // Scroll parallax
+  let scrollTarget=0;
+  window.addEventListener('scroll',()=>{scrollTarget=window.scrollY/(document.body.scrollHeight-window.innerHeight)});
+
+  // Animation
+  function animate(){
+    requestAnimationFrame(animate);
+    mouseX+=(targetX-mouseX)*0.03;
+    mouseY+=(targetY-mouseY)*0.03;
+
+    points.rotation.x+=0.0002;
+    points.rotation.y+=0.0003;
+    points.rotation.x+=mouseY*0.0005;
+    points.rotation.y+=mouseX*0.0005;
+
+    // Subtle scroll parallax
+    points.position.y=-scrollTarget*2;
+
+    renderer.render(scene,camera);
+  }
+  animate();
+
+  // Update connection lines periodically
+  setInterval(updateLines,4000);
+
+  window.addEventListener('resize',()=>{
+    renderer.setSize(window.innerWidth,window.innerHeight);
+    camera.aspect=window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+  });
+})();
+
+/* ── Navbar scroll effect ── */
+const navbar=document.getElementById('navbar');
+window.addEventListener('scroll',()=>{
+  navbar.classList.toggle('scrolled',window.scrollY>50);
+});
+
+/* ── Scroll Reveal ── */
+const revealObserver=new IntersectionObserver(entries=>{
+  entries.forEach(entry=>{
+    if(entry.isIntersecting){
+      entry.target.classList.add('visible');
+      // Animate bars within benchmark when visible
+      entry.target.querySelectorAll('.reveal-bar').forEach(bar=>{
+        bar.style.width=bar.style.width; // trigger reflow
+      });
+    }
+  });
+},{threshold:0.15,rootMargin:'0px 0px -50px 0px'});
+
+document.querySelectorAll('.reveal').forEach(el=>revealObserver.observe(el));
+
+/* ── Parallax for decorative orbs ── */
+window.addEventListener('scroll',()=>{
+  const scrolled=window.scrollY;
+  document.querySelectorAll('.decoration.orb').forEach((orb,i)=>{
+    const speed=(i+1)*0.03;
+    orb.style.transform=`translateY(${scrolled*speed}px)`;
+  });
+});
+
+/* ── Smooth counter animation for stat cards ── */
+const statObserver=new IntersectionObserver(entries=>{
+  entries.forEach(entry=>{
+    if(entry.isIntersecting){
+      const el=entry.target.querySelector('.stat-number');
+      if(el&&!el.dataset.animated){
+        el.dataset.animated='1';
+        const text=el.textContent.trim();
+        const match=text.match(/^([\d.]+)(.*)$/);
+        if(match){
+          const target=parseFloat(match[1].replace(/,/g,''));
+          const suffix=match[2];
+          const duration=1500;
+          const start=performance.now();
+          const isInt=!match[1].includes('.');
+          function tick(now){
+            const progress=Math.min((now-start)/duration,1);
+            const eased=1-Math.pow(1-progress,3);
+            const current=isInt?Math.round(target*eased):(target*eased).toFixed(1);
+            el.textContent=current+suffix;
+            if(progress<1)requestAnimationFrame(tick);
+          }
+          requestAnimationFrame(tick);
+        }
+      }
+    }
+  });
+},{threshold:0.5});
+
+document.querySelectorAll('.stat-card').forEach(card=>statObserver.observe(card));
+</script>
+</body>
+</html>

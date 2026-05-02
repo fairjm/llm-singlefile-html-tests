@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>蟑螂模拟器</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background:
+      radial-gradient(ellipse at 30% 20%, #b8a898 0%, transparent 60%),
+      radial-gradient(ellipse at 70% 60%, #c4b5a5 0%, transparent 60%),
+      radial-gradient(ellipse at 50% 80%, #a89888 0%, transparent 50%),
+      linear-gradient(180deg, #c0b0a0, #9b8c7c);
+    background-color: #a89888;
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: default;
+    font-family: system-ui, sans-serif;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.35) 100%);
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  #particle-canvas {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  #roach-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  .roach-container {
+    position: absolute;
+    pointer-events: auto;
+    cursor: pointer;
+    will-change: transform, left, top;
+  }
+
+  .roach-body {
+    width: 100px;
+    height: 70px;
+    margin-left: -50px;
+    margin-top: -35px;
+    filter: drop-shadow(3px 4px 4px rgba(0,0,0,0.45));
+    transition: filter 0.2s;
+  }
+
+  .roach-body:hover {
+    filter: drop-shadow(3px 4px 6px rgba(0,0,0,0.6)) brightness(1.1);
+  }
+
+  .roach-body.idle {
+    animation: roach-idle 1.2s ease-in-out infinite;
+  }
+
+  .roach-body.moving {
+    animation: roach-walk 0.35s ease-in-out infinite;
+  }
+
+  .roach-body.running {
+    animation: roach-run 0.12s ease-in-out infinite;
+    filter: drop-shadow(3px 4px 4px rgba(180,40,20,0.5));
+  }
+
+  .roach-body.exploding {
+    animation: roach-explode 0.5s ease-out forwards;
+    pointer-events: none;
+  }
+
+  @keyframes roach-idle {
+    0%, 100% { transform: translateY(0) rotate(0deg) scale(1); }
+    30%  { transform: translateY(-4px) rotate(0.8deg) scale(1.02); }
+    60%  { transform: translateY(-2px) rotate(-0.5deg) scale(1.01); }
+  }
+
+  @keyframes roach-walk {
+    0%, 100% { transform: rotate(-4deg) translateY(0); }
+    25%  { transform: rotate(-2deg) translateY(-3px); }
+    75%  { transform: rotate(3deg) translateY(-1px); }
+  }
+
+  @keyframes roach-run {
+    0%, 100% { transform: rotate(-8deg) translateY(0) scale(1.05); }
+    25%  { transform: rotate(0deg) translateY(-5px) scale(1.02); }
+    50%  { transform: rotate(8deg) translateY(-2px) scale(1.05); }
+    75%  { transform: rotate(2deg) translateY(-4px) scale(1.02); }
+  }
+
+  @keyframes roach-explode {
+    0%   { transform: scale(1) rotate(0deg); opacity: 1; filter: brightness(1) drop-shadow(3px 4px 4px rgba(0,0,0,0.45)); }
+    30%  { transform: scale(1.5) rotate(15deg); opacity: 0.8; filter: brightness(2) drop-shadow(0 0 10px rgba(255,200,50,0.8)); }
+    100% { transform: scale(2.5) rotate(-30deg); opacity: 0; filter: brightness(3) drop-shadow(0 0 20px rgba(255,150,0,0)); }
+  }
+
+  .hint {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: rgba(255,255,255,0.6);
+    font-size: 14px;
+    letter-spacing: 1px;
+    z-index: 101;
+    pointer-events: none;
+    transition: opacity 1s;
+  }
+
+  .score {
+    position: fixed;
+    top: 20px;
+    right: 30px;
+    color: rgba(255,255,255,0.5);
+    font-size: 13px;
+    z-index: 101;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="particle-canvas"></canvas>
+<div id="roach-layer"></div>
+<div class="hint" id="hint">🪳 点击蟑螂：第一次加速 · 第二次消灭</div>
+<div class="score" id="score">已消灭: 0</div>
+
+<template id="roach-template">
+  <div class="roach-body">
+    <svg viewBox="0 0 100 70" width="100" height="70" xmlns="http://www.w3.org/2000/svg">
+      <!-- Cerci (尾部) -->
+      <path d="M88 32 Q98 27 102 22" stroke="#1a0a00" fill="none" stroke-width="1" stroke-linecap="round"/>
+      <path d="M88 38 Q98 42 104 46" stroke="#1a0a00" fill="none" stroke-width="1" stroke-linecap="round"/>
+
+      <!-- 后足 -->
+      <g stroke="#1a0a00" fill="none" stroke-width="1.8" stroke-linecap="round">
+        <path d="M65 42 L78 56 L85 63"/>
+        <path d="M65 28 L78 16 L86 10"/>
+      </g>
+
+      <!-- 中足 -->
+      <g stroke="#1a0a00" fill="none" stroke-width="1.8" stroke-linecap="round">
+        <path d="M40 44 L45 60 L48 68"/>
+        <path d="M40 26 L45 12 L43 6"/>
+      </g>
+
+      <!-- 前足 -->
+      <g stroke="#1a0a00" fill="none" stroke-width="1.8" stroke-linecap="round">
+        <path d="M18 42 L10 58 L6 65"/>
+        <path d="M18 28 L10 14 L4 8"/>
+      </g>
+
+      <!-- 腹部 (翅膀下方) -->
+      <ellipse cx="55" cy="35" rx="28" ry="14" fill="#1f0e04"/>
+
+      <!-- 翅膀 -->
+      <ellipse cx="56" cy="30" rx="30" ry="10" fill="#4a2610"/>
+      <ellipse cx="56" cy="34" rx="29" ry="9" fill="#3b1d0a"/>
+      <path d="M28 35 Q55 28 84 35" stroke="#2a1405" fill="none" stroke-width="0.6" opacity="0.6"/>
+
+      <!-- 前胸背板 -->
+      <ellipse cx="28" cy="33" rx="14" ry="12" fill="#5c3014"/>
+      <ellipse cx="28" cy="31" rx="10" ry="6" fill="#4a2210" opacity="0.5"/>
+
+      <!-- 头部 -->
+      <ellipse cx="13" cy="33" rx="9" ry="7" fill="#361a08"/>
+
+      <!-- 眼睛 -->
+      <circle cx="8" cy="30" r="2.5" fill="#080400"/>
+      <circle cx="8" cy="36" r="2.5" fill="#080400"/>
+      <circle cx="7.5" cy="30" r="1" fill="#1a0a00"/>
+      <circle cx="7.5" cy="36" r="1" fill="#1a0a00"/>
+
+      <!-- 触角 -->
+      <g stroke="#1a0a00" fill="none" stroke-width="1.1" stroke-linecap="round">
+        <path d="M4 30 Q-10 14 -20 6"/>
+        <path d="M4 33 Q-12 24 -24 18"/>
+      </g>
+
+      <!-- 翅脉纹理 -->
+      <g stroke="#2a1405" fill="none" stroke-width="0.4" opacity="0.3">
+        <path d="M35 33 Q45 25 56 28"/>
+        <path d="M38 35 Q50 30 60 32"/>
+        <path d="M35 37 Q45 40 56 38"/>
+      </g>
+    </svg>
+  </div>
+</template>
+
+<script>
+(function() {
+  // ===== 配置 =====
+  const CONFIG = {
+    initialCount: 4,
+    maxCount: 10,
+    spawnInterval: [4000, 10000],   // 新蟑螂生成间隔 (ms)
+    edgeMargin: 60,
+    spawnMargin: 80,
+
+    // 移动速度 (px/s)
+    moveSpeed: [50, 100],
+    runSpeedMultiplier: 2.8,
+
+    // 状态持续时间 (ms)
+    idleDuration: [800, 2500],
+    moveDuration: [1500, 4000],
+
+    // 转向
+    turnInterval: [400, 1200],      // 移动时转向间隔
+    turnAngleMax: 0.6,              // 最大转向角度 (弧度, ~35°)
+    angleLerpSpeed: 8,              // 角度平滑过渡速度
+
+    // 粒子
+    dustPerSecond: 25,              // 移动时每秒灰尘
+    dustRunMultiplier: 3,
+    maxParticles: 600,
+
+    // 爆炸
+    explosionParticles: 55,
+    gooParticles: 20,
+  };
+
+  // ===== 工具函数 =====
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const randInt = (a, b) => Math.floor(rand(a, b + 1));
+  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+  // ===== 粒子系统 =====
+  const canvas = document.getElementById('particle-canvas');
+  const ctx = canvas.getContext('2d');
+  let particles = [];
+  let canvasW, canvasH;
+
+  function resizeCanvas() {
+    canvasW = window.innerWidth;
+    canvasH = window.innerHeight;
+    canvas.width = canvasW;
+    canvas.height = canvasH;
+  }
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+
+  class Particle {
+    constructor(x, y, vx, vy, life, color, size, gravity = 0) {
+      this.x = x;
+      this.y = y;
+      this.vx = vx;
+      this.vy = vy;
+      this.life = life;
+      this.maxLife = life;
+      this.color = color;
+      this.size = size;
+      this.gravity = gravity;
+    }
+
+    update(dt) {
+      this.x += this.vx * dt;
+      this.y += this.vy * dt;
+      this.vy += this.gravity * dt;
+      this.vx *= 0.99;
+      this.vy *= 0.99;
+      this.life -= dt;
+    }
+
+    get alpha() { return Math.max(0, this.life / this.maxLife); }
+    get alive() { return this.life > 0; }
+
+    draw(ctx) {
+      const a = this.alpha;
+      ctx.globalAlpha = a;
+      ctx.fillStyle = this.color;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.size * (0.5 + 0.5 * a), 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function emitParticles(x, y, count, config) {
+    for (let i = 0; i < count; i++) {
+      const angle = rand(0, Math.PI * 2);
+      const speed = rand(config.speedMin, config.speedMax);
+      const vx = Math.cos(angle) * speed;
+      const vy = Math.sin(angle) * speed;
+      const life = rand(config.lifeMin, config.lifeMax);
+      const color = pick(config.colors);
+      const size = rand(config.sizeMin, config.sizeMax);
+      const gravity = config.gravity || 0;
+      particles.push(new Particle(x, y, vx, vy, life, color, size, gravity));
+    }
+  }
+
+  function emitDust(x, y, count) {
+    for (let i = 0; i < count; i++) {
+      const angle = rand(-Math.PI, Math.PI);
+      const speed = rand(15, 60);
+      const vx = Math.cos(angle) * speed;
+      const vy = Math.sin(angle) * speed - rand(20, 50);
+      const life = rand(0.2, 0.6);
+      const color = pick(['#b5a595', '#c4b5a5', '#9b8c7c', '#8b7c6c', '#a09080']);
+      const size = rand(0.8, 2.5);
+      particles.push(new Particle(x, y, vx, vy, life, color, size, 30));
+    }
+  }
+
+  function emitExplosion(x, y) {
+    const bodyColors = ['#3d1c02', '#2a1000', '#5c2e0e', '#4a2010', '#1a0a00'];
+    const gooColors = ['#8ba832', '#9bc040', '#7a9828', '#c8d860', '#a0b838', '#6b8820'];
+    const fragmentColors = ['#d4c5b5', '#e8d8c8', '#c4b5a5', '#fff8f0', '#f0e0d0'];
+
+    // 身体碎片
+    emitParticles(x, y, CONFIG.explosionParticles, {
+      speedMin: 80, speedMax: 350,
+      lifeMin: 0.3, lifeMax: 1.0,
+      colors: bodyColors,
+      sizeMin: 2, sizeMax: 7,
+      gravity: 120,
+    });
+
+    // 汁液
+    emitParticles(x, y, CONFIG.gooParticles, {
+      speedMin: 40, speedMax: 200,
+      lifeMin: 0.4, lifeMax: 1.2,
+      colors: gooColors,
+      sizeMin: 1.5, sizeMax: 5,
+      gravity: 80,
+    });
+
+    // 细小碎片
+    emitParticles(x, y, 25, {
+      speedMin: 100, speedMax: 450,
+      lifeMin: 0.2, lifeMax: 0.7,
+      colors: fragmentColors,
+      sizeMin: 0.5, sizeMax: 2,
+      gravity: 40,
+    });
+
+    // 冲击波环
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2;
+      const speed = 150;
+      const vx = Math.cos(angle) * speed;
+      const vy = Math.sin(angle) * speed;
+      const p = new Particle(x, y, vx, vy, 0.25, '#ffdd88', rand(1, 3), 0);
+      particles.push(p);
+    }
+  }
+
+  function updateParticles(dt) {
+    for (let i = particles.length - 1; i >= 0; i--) {
+      particles[i].update(dt);
+      if (!particles[i].alive) {
+        particles.splice(i, 1);
+      }
+    }
+    // 限制最大粒子数
+    while (particles.length > CONFIG.maxParticles) {
+      particles.shift();
+    }
+  }
+
+  function drawParticles() {
+    ctx.clearRect(0, 0, canvasW, canvasH);
+    for (const p of particles) {
+      p.draw(ctx);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ===== 蟑螂类 =====
+  const roachLayer = document.getElementById('roach-layer');
+  const template = document.getElementById('roach-template');
+
+  class Cockroach {
+    constructor(x, y) {
+      this.x = x;
+      this.y = y;
+      this.angle = rand(0, Math.PI * 2);
+      this.displayAngle = this.angle;
+      this.speed = 0;
+      this.baseSpeed = rand(CONFIG.moveSpeed[0], CONFIG.moveSpeed[1]);
+      this.state = 'idle';   // idle | moving | running | exploding
+      this.clickCount = 0;
+      this.scale = rand(0.7, 1.3);
+      this.opacity = 1;
+
+      // 计时器
+      this.stateTimer = rand(CONFIG.idleDuration[0], CONFIG.idleDuration[1]) / 1000;
+      this.turnTimer = 0;
+      this.dustTimer = 0;
+
+      // DOM
+      this.container = document.createElement('div');
+      this.container.className = 'roach-container';
+      this.container.style.transform = `translate(${x}px, ${y}px) rotate(${this.displayAngle + Math.PI}rad) scale(${this.scale})`;
+
+      const clone = template.content.cloneNode(true);
+      this.body = clone.querySelector('.roach-body');
+      this.body.classList.add('idle');
+      this.container.appendChild(clone);
+
+      this.container.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.onClick();
+      });
+
+      roachLayer.appendChild(this.container);
+    }
+
+    onClick() {
+      if (this.state === 'exploding') return;
+
+      this.clickCount++;
+      if (this.clickCount === 1) {
+        this.enterRunning();
+      } else if (this.clickCount >= 2) {
+        this.explode();
+      }
+    }
+
+    enterRunning() {
+      this.state = 'running';
+      this.speed = this.baseSpeed * CONFIG.runSpeedMultiplier;
+      this.body.classList.remove('idle', 'moving');
+      this.body.classList.add('running');
+      this.stateTimer = 999; // 一直跑直到被再次点击
+      this.turnTimer = rand(0.1, 0.3);
+    }
+
+    explode() {
+      this.state = 'exploding';
+      this.speed = 0;
+      this.body.classList.remove('idle', 'moving', 'running');
+      this.body.classList.add('exploding');
+
+      const worldX = this.x;
+      const worldY = this.y;
+      emitExplosion(worldX, worldY);
+
+      // 更新击杀计数
+      killCount++;
+      document.getElementById('score').textContent = `已消灭: ${killCount}`;
+
+      // 动画结束后移除
+      setTimeout(() => this.remove(), 500);
+    }
+
+    remove() {
+      if (this.container.parentNode) {
+        this.container.parentNode.removeChild(this.container);
+      }
+      this.dead = true;
+    }
+
+    update(dt) {
+      if (this.state === 'exploding' || this.dead) return;
+
+      this.stateTimer -= dt;
+
+      switch (this.state) {
+        case 'idle':
+          this.speed = 0;
+          if (this.stateTimer <= 0) {
+            this.enterMoving();
+          }
+          // 空闲时缓慢随机旋转
+          this.angle += rand(-0.3, 0.3) * dt;
+          break;
+
+        case 'moving':
+          this.updateMovement(dt);
+          if (this.stateTimer <= 0) {
+            this.enterIdle();
+          }
+          break;
+
+        case 'running':
+          this.updateMovement(dt);
+          // 跑动时更频繁转向
+          this.turnTimer -= dt;
+          if (this.turnTimer <= 0) {
+            this.angle += rand(-CONFIG.turnAngleMax * 1.5, CONFIG.turnAngleMax * 1.5);
+            this.turnTimer = rand(0.1, 0.35);
+          }
+          break;
+      }
+
+      // 移动
+      if (this.speed > 0) {
+        const dx = Math.cos(this.angle) * this.speed * dt;
+        const dy = Math.sin(this.angle) * this.speed * dt;
+        this.x += dx;
+        this.y += dy;
+
+        // 灰尘
+        if (this.state === 'moving' || this.state === 'running') {
+          this.dustTimer -= dt;
+          const dustRate = this.state === 'running'
+            ? 1 / (CONFIG.dustPerSecond * CONFIG.dustRunMultiplier)
+            : 1 / CONFIG.dustPerSecond;
+          if (this.dustTimer <= 0) {
+            const rearX = this.x - Math.cos(this.angle) * 30 * this.scale;
+            const rearY = this.y - Math.sin(this.angle) * 30 * this.scale;
+            emitDust(rearX, rearY, this.state === 'running' ? 3 : 1);
+            this.dustTimer = dustRate;
+          }
+        }
+
+        // 边缘反弹
+        this.bounceEdges();
+      }
+
+      // 平滑角度过渡
+      this.displayAngle = lerpAngle(this.displayAngle, this.angle, CONFIG.angleLerpSpeed * dt);
+
+      // 更新 DOM
+      this.container.style.transform =
+        `translate(${this.x}px, ${this.y}px) rotate(${this.displayAngle + Math.PI}rad) scale(${this.scale})`;
+      this.container.style.opacity = this.opacity;
+    }
+
+    updateMovement(dt) {
+      this.turnTimer -= dt;
+      if (this.turnTimer <= 0) {
+        this.angle += rand(-CONFIG.turnAngleMax, CONFIG.turnAngleMax);
+        this.turnTimer = rand(CONFIG.turnInterval[0], CONFIG.turnInterval[1]) / 1000;
+      }
+    }
+
+    bounceEdges() {
+      const m = CONFIG.edgeMargin;
+      let dx = Math.cos(this.angle);
+      let dy = Math.sin(this.angle);
+
+      if (this.x < m) dx = Math.abs(dx);
+      if (this.x > canvasW - m) dx = -Math.abs(dx);
+      if (this.y < m) dy = Math.abs(dy);
+      if (this.y > canvasH - m) dy = -Math.abs(dy);
+
+      this.angle = Math.atan2(dy, dx);
+    }
+
+    enterMoving() {
+      this.state = 'moving';
+      this.speed = this.baseSpeed;
+      this.body.classList.remove('idle', 'running');
+      this.body.classList.add('moving');
+      this.stateTimer = rand(CONFIG.moveDuration[0], CONFIG.moveDuration[1]) / 1000;
+      this.turnTimer = rand(CONFIG.turnInterval[0], CONFIG.turnInterval[1]) / 1000;
+      // 给一个初始运动方向
+      this.angle = rand(0, Math.PI * 2);
+      this.displayAngle = this.angle;
+    }
+
+    enterIdle() {
+      this.state = 'idle';
+      this.speed = 0;
+      this.body.classList.remove('moving', 'running');
+      this.body.classList.add('idle');
+      this.stateTimer = rand(CONFIG.idleDuration[0], CONFIG.idleDuration[1]) / 1000;
+    }
+
+    isAlive() {
+      return !this.dead && this.state !== 'exploding';
+    }
+  }
+
+  // ===== 工具：角度线性插值 (处理环绕) =====
+  function lerpAngle(a, b, t) {
+    let diff = b - a;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    return a + diff * Math.min(t, 1);
+  }
+
+  // ===== 全局状态 =====
+  let cockroaches = [];
+  let killCount = 0;
+  let spawnTimer = rand(CONFIG.spawnInterval[0], CONFIG.spawnInterval[1]) / 1000;
+
+  // ===== 点击空白处生成蟑螂 =====
+  document.body.addEventListener('click', (e) => {
+    if (e.target === document.body || e.target === canvas || e.target === roachLayer) {
+      if (cockroaches.filter(c => c.isAlive()).length < CONFIG.maxCount) {
+        spawnCockroach(e.clientX, e.clientY);
+      }
+    }
+  });
+
+  function spawnCockroach(x, y) {
+    const c = new Cockroach(x, y);
+    cockroaches.push(c);
+  }
+
+  function spawnRandomCockroach() {
+    const m = CONFIG.spawnMargin;
+    const x = rand(m, canvasW - m);
+    const y = rand(m, canvasH - m);
+    spawnCockroach(x, y);
+  }
+
+  // ===== 游戏循环 =====
+  let lastTime = performance.now();
+
+  function gameLoop(time) {
+    const dt = Math.min((time - lastTime) / 1000, 0.15);
+    lastTime = time;
+
+    // 定时生成新蟑螂
+    const alive = cockroaches.filter(c => c.isAlive());
+    if (alive.length < CONFIG.maxCount) {
+      spawnTimer -= dt;
+      if (spawnTimer <= 0) {
+        spawnRandomCockroach();
+        spawnTimer = rand(CONFIG.spawnInterval[0], CONFIG.spawnInterval[1]) / 1000;
+      }
+    }
+
+    // 更新蟑螂
+    for (const c of cockroaches) {
+      c.update(dt);
+    }
+
+    // 清理死蟑螂引用 (延迟清理避免索引问题)
+    cockroaches = cockroaches.filter(c => !c.dead);
+
+    // 更新和绘制粒子
+    updateParticles(dt);
+    drawParticles();
+
+    requestAnimationFrame(gameLoop);
+  }
+
+  // ===== 初始化 =====
+  function init() {
+    for (let i = 0; i < CONFIG.initialCount; i++) {
+      spawnRandomCockroach();
+    }
+
+    // 隐藏提示文字的计时器
+    setTimeout(() => {
+      const hint = document.getElementById('hint');
+      if (hint) hint.style.opacity = '0.3';
+    }, 8000);
+
+    requestAnimationFrame(gameLoop);
+  }
+
+  // 窗口尺寸变化时更新蟑螂位置约束
+  window.addEventListener('resize', () => {
+    for (const c of cockroaches) {
+      if (c.isAlive()) {
+        c.x = Math.min(Math.max(c.x, CONFIG.edgeMargin), canvasW - CONFIG.edgeMargin);
+        c.y = Math.min(Math.max(c.y, CONFIG.edgeMargin), canvasH - CONFIG.edgeMargin);
+      }
+    }
+  });
+
+  init();
+})();
+</script>
+</body>
+</html>

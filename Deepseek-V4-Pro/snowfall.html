@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>雪花效果</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            overflow: hidden;
+            height: 100vh; width: 100vw;
+            background: linear-gradient(180deg, #0f0c29 0%, #1a1a3e 30%, #24243e 60%, #1a1a2e 100%);
+            user-select: none;
+        }
+        #groundCanvas {
+            position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 5;
+            pointer-events: none;
+        }
+        .page-element {
+            position: absolute;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+            display: flex;
+            align-items: center; justify-content: center;
+            color: rgba(255,255,255,0.9);
+            font-weight: 600; font-size: 15px; letter-spacing: 0.5px;
+            border: 1px solid rgba(255,255,255,0.1);
+            z-index: 10;
+            transition: box-shadow 0.4s;
+        }
+        .page-element:hover {
+            box-shadow: 0 12px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.15);
+        }
+        #snowCanvas {
+            position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 100;
+            pointer-events: none;
+        }
+        #controls {
+            position: fixed; top: 16px; right: 16px; z-index: 200;
+            background: rgba(15,12,41,0.88);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 16px; padding: 20px 22px;
+            color: #e0e0f0; width: 268px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            font-size: 13px;
+        }
+        #controls h3 { font-size: 16px; font-weight: 700; margin-bottom: 14px; text-align: center; letter-spacing: 1px; color: #fff; text-shadow: 0 0 20px rgba(150,180,255,0.4); }
+        .control-group { margin-bottom: 12px; }
+        .control-group label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-weight: 500; }
+        .control-group label .val { color: #8eb8ff; font-weight: 700; font-size: 12px; min-width: 36px; text-align: right; }
+        input[type="range"] { -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.15); outline: none; cursor: pointer; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #8eb8ff; cursor: pointer; border: 2px solid rgba(255,255,255,0.6); box-shadow: 0 0 8px rgba(142,184,255,0.5); }
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.08); color: #d0d0f0; cursor: pointer; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; transition: all 0.2s; }
+        .btn:hover { background: rgba(255,255,255,0.16); border-color: rgba(255,255,255,0.35); color: #fff; }
+        .btn-row { display: flex; gap: 8px; margin-top: 14px; }
+    </style>
+</head>
+<body>
+
+    <div id="controls">
+        <h3>❄ 雪花控制台</h3>
+        <div class="control-group">
+            <label>风速 <span class="val" id="windSpeedVal">30</span></label>
+            <input type="range" id="windSpeed" min="0" max="100" value="30" step="1">
+        </div>
+        <div class="control-group">
+            <label>风向（左← →右） <span class="val" id="windDirVal">0</span></label>
+            <input type="range" id="windDir" min="-100" max="100" value="0" step="1">
+        </div>
+        <div class="control-group">
+            <label>密度 <span class="val" id="densityVal">350</span></label>
+            <input type="range" id="density" min="50" max="600" value="350" step="10">
+        </div>
+        <div class="control-group">
+            <label>下落速度 <span class="val" id="fallSpeedVal">1.0x</span></label>
+            <input type="range" id="fallSpeed" min="20" max="300" value="100" step="5">
+        </div>
+        <div class="btn-row">
+            <button class="btn" id="btnResetSnow">✦ 清除积雪</button>
+            <button class="btn" id="btnResetElements">↻ 重新生成</button>
+        </div>
+    </div>
+
+    <canvas id="groundCanvas"></canvas>
+    <canvas id="snowCanvas"></canvas>
+
+    <script>
+    (function() {
+        'use strict';
+
+        const snowCanvas = document.getElementById('snowCanvas');
+        const snowCtx = snowCanvas.getContext('2d');
+        const groundCanvas = document.getElementById('groundCanvas');
+        const groundCtx = groundCanvas.getContext('2d');
+
+        // ==================== CONFIG ====================
+        const config = {
+            windSpeed: 30,
+            windDirection: 0,
+            density: 350,
+            fallSpeed: 1.0,
+        };
+
+        // ==================== HEIGHT MAP ====================
+        const COL_WIDTH = 3;
+        let numCols = 0;
+        let baseY = null;
+        let elementSnow = null;     // snow accumulated on top of elements, per column
+        let groundSnow = null;      // snow accumulated on ground, per column
+
+        function setupHeightMap() {
+            numCols = Math.ceil(Math.max(snowCanvas.width, 1) / COL_WIDTH);
+            baseY = new Float32Array(numCols);
+            elementSnow = new Float32Array(numCols);
+            groundSnow = new Float32Array(numCols);
+            recalcBaseY();
+        }
+
+        function recalcBaseY() {
+            baseY.fill(snowCanvas.height);
+            const elements = document.querySelectorAll('.page-element');
+            for (const el of elements) {
+                const rect = el.getBoundingClientRect();
+                const startCol = Math.max(0, Math.floor(rect.left / COL_WIDTH));
+                const endCol = Math.min(numCols - 1, Math.floor(rect.right / COL_WIDTH));
+                for (let c = startCol; c <= endCol; c++) {
+                    if (rect.top < baseY[c]) {
+                        baseY[c] = rect.top;
+                    }
+                }
+            }
+        }
+
+        function clearSnow() {
+            elementSnow.fill(0);
+            groundSnow.fill(0);
+        }
+
+        function smoothGroundSnow() {
+            const orig = new Float32Array(groundSnow);
+            for (let c = 1; c < numCols - 1; c++) {
+                groundSnow[c] = orig[c - 1] * 0.18 + orig[c] * 0.64 + orig[c + 1] * 0.18;
+            }
+        }
+
+        function smoothElementSnow() {
+            const orig = new Float32Array(elementSnow);
+            for (let c = 1; c < numCols - 1; c++) {
+                elementSnow[c] = orig[c - 1] * 0.22 + orig[c] * 0.56 + orig[c + 1] * 0.22;
+            }
+        }
+
+        // ==================== NOISE ====================
+        const NOISE_LEN = 1024;
+        const noise = new Float32Array(NOISE_LEN);
+        for (let i = 0; i < NOISE_LEN; i++) {
+            noise[i] = Math.sin(i * 0.037) * 2.5 + Math.sin(i * 0.091 + 1.7) * 1.8 + Math.sin(i * 0.173 + 3.1) * 1.0 + Math.sin(i * 0.029 + 5.5) * 0.7;
+        }
+
+        // ==================== PAGE ELEMENTS ====================
+        const ELEMENT_COLORS = [
+            '#4A90D9','#2CB5A3','#7B68EE','#E8734A',
+            '#E84A7A','#4CAF50','#FF9800','#3F51B5',
+            '#009688','#9C27B0','#00BCD4','#795548',
+        ];
+        const ELEMENT_LABELS = [
+            'Header','Sidebar','Card','Button','Content',
+            'Panel','Footer','Widget','Nav','Banner',
+            'Modal','Chart','Table','Form','Alert',
+        ];
+
+        function generatePageElements() {
+            document.querySelectorAll('.page-element').forEach(el => el.remove());
+            const count = 7 + Math.floor(Math.random() * 4);
+            const vw = window.innerWidth;
+            const vh = window.innerHeight;
+            const ctrlZone = { left: vw - 320, top: 0, right: vw, bottom: 440 };
+            const placed = [];
+
+            for (let i = 0; i < count; i++) {
+                const el = document.createElement('div');
+                el.className = 'page-element';
+                let w = 70 + Math.random() * 260;
+                let h = 35 + Math.random() * 170;
+                if (i === 0) { w = 180 + Math.random() * 70; h = 40 + Math.random() * 25; }
+                else if (i === 1) { w = 110 + Math.random() * 60; h = 300 + Math.random() * 180; }
+                else if (i === 2) { w = 280 + Math.random() * 220; h = 180 + Math.random() * 160; }
+
+                let x, y, attempts = 0;
+                do {
+                    x = 10 + Math.random() * (vw - w - 20);
+                    y = 10 + Math.random() * (vh - h - 20);
+                    attempts++;
+                } while (attempts < 60 && overlapping(x, y, w, h, ctrlZone, placed));
+                placed.push({ x, y, w, h });
+
+                el.style.left = x + 'px'; el.style.top = y + 'px';
+                el.style.width = w + 'px'; el.style.height = h + 'px';
+                el.style.background = `linear-gradient(135deg,${ELEMENT_COLORS[i%12]}dd,${ELEMENT_COLORS[(i+1)%12]}bb)`;
+                el.textContent = ELEMENT_LABELS[i % 15];
+                document.body.appendChild(el);
+            }
+            recalcBaseY();
+        }
+
+        function overlapping(x, y, w, h, ctrlZone, placed) {
+            if (x + w > ctrlZone.left && x < ctrlZone.right && y + h > ctrlZone.top && y < ctrlZone.bottom) return true;
+            for (const p of placed) {
+                if (x < p.x + p.w && x + w > p.x && y < p.y + p.h && y + h > p.y) return true;
+            }
+            return false;
+        }
+
+        // ==================== SNOWFLAKE ====================
+        class Snowflake {
+            constructor() { this.reset(true); }
+
+            reset(initial) {
+                this.x = Math.random() * snowCanvas.width;
+                this.y = initial ? -(Math.random() * snowCanvas.height) : (-10 - Math.random() * 200);
+                this.size = 1.2 + Math.random() * 3.2;
+                this.opacity = 0.45 + Math.random() * 0.5;
+                this.landed = false;
+                this.wobblePhase = Math.random() * Math.PI * 2;
+                this.wobbleFreq = 0.8 + Math.random() * 2.5;
+                this.wobbleAmp = 15 + Math.random() * 50;
+                this.fallFactor = 0.6 + Math.random() * 0.8;
+            }
+
+            update(dt) {
+                if (this.landed) return false;
+                const windVx = config.windSpeed * (config.windDirection / 100) * 2.0;
+                this.wobblePhase += this.wobbleFreq * Math.PI * 2 * dt;
+                this.x += (windVx + Math.sin(this.wobblePhase) * this.wobbleAmp) * dt;
+                this.y += (50 + this.size * 30) * config.fallSpeed * this.fallFactor * dt;
+
+                if (this.x < -60) this.x = snowCanvas.width + 50;
+                if (this.x > snowCanvas.width + 60) this.x = -50;
+                if (this.y > snowCanvas.height + 200) { this.reset(false); return false; }
+
+                const col = Math.floor(this.x / COL_WIDTH);
+                if (col >= 0 && col < numCols) {
+                    let surface;
+                    if (baseY[col] < snowCanvas.height) {
+                        surface = baseY[col] - elementSnow[col];
+                    } else {
+                        surface = snowCanvas.height - groundSnow[col];
+                    }
+                    if (this.y >= surface) {
+                        this.y = surface;
+                        this.landed = true;
+                        this.accumulate(col);
+                        setTimeout(() => { this.reset(false); }, 50);
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            accumulate(col) {
+                const radius = this.size * 3.0;
+                const colRadius = Math.ceil(radius / COL_WIDTH);
+                const startCol = Math.max(0, col - colRadius);
+                const endCol = Math.min(numCols - 1, col + colRadius);
+                for (let c = startCol; c <= endCol; c++) {
+                    const dist = Math.abs(c - col) * COL_WIDTH;
+                    if (dist <= radius) {
+                        const factor = 1 - (dist / radius);
+                        const amount = this.size * 0.5 * factor;
+                        if (baseY[c] < snowCanvas.height) {
+                            elementSnow[c] += amount;
+                        } else {
+                            groundSnow[c] += amount;
+                        }
+                    }
+                }
+            }
+        }
+
+        // ==================== SNOWFLAKES ARRAY ====================
+        let snowflakes = [];
+        function spawnSnowflakes() {
+            snowflakes = [];
+            for (let i = 0; i < config.density; i++) snowflakes.push(new Snowflake());
+        }
+        function manageSnowflakeCount() {
+            while (snowflakes.length < config.density) snowflakes.push(new Snowflake());
+            while (snowflakes.length > config.density) snowflakes.pop();
+        }
+
+        // ==================== RENDERING ====================
+        function renderGroundSnow() {
+            let hasSnow = false;
+            for (let c = 0; c < numCols; c++) { if (groundSnow[c] > 0.3) { hasSnow = true; break; } }
+            if (!hasSnow) return;
+
+            const ctx = groundCtx;
+            ctx.clearRect(0, 0, groundCanvas.width, groundCanvas.height);
+
+            const topY = snowCanvas.height;
+            const grad = ctx.createLinearGradient(0, topY - 40, 0, topY);
+            grad.addColorStop(0, 'rgba(250, 252, 255, 0.94)');
+            grad.addColorStop(0.5, 'rgba(245, 248, 255, 0.9)');
+            grad.addColorStop(1, 'rgba(218, 228, 242, 0.83)');
+
+            ctx.beginPath();
+            ctx.moveTo(0, topY);
+            for (let c = 0; c < numCols; c++) {
+                const x = c * COL_WIDTH;
+                const n = groundSnow[c] > 3 ? noise[c % NOISE_LEN] * 1.2 : 0;
+                const sy = topY - groundSnow[c] + n;
+                ctx.lineTo(x, sy);
+            }
+            ctx.lineTo(groundCanvas.width, topY);
+            ctx.closePath();
+            ctx.fillStyle = grad;
+            ctx.fill();
+
+            ctx.beginPath();
+            let started = false;
+            for (let c = 0; c < numCols; c++) {
+                if (groundSnow[c] <= 0.3) { if (started) { ctx.stroke(); ctx.beginPath(); started = false; } continue; }
+                const x = c * COL_WIDTH;
+                const n = groundSnow[c] > 3 ? noise[c % NOISE_LEN] * 1.2 : 0;
+                const sy = topY - groundSnow[c] + n;
+                if (!started) { ctx.moveTo(x, sy); started = true; }
+                else ctx.lineTo(x, sy);
+            }
+            if (started) { ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1; ctx.stroke(); }
+        }
+
+        function renderElementSnow() {
+            let hasSnow = false;
+            for (let c = 0; c < numCols; c++) { if (elementSnow[c] > 0.3 && baseY[c] < snowCanvas.height) { hasSnow = true; break; } }
+            if (!hasSnow) return;
+
+            const ctx = snowCtx;
+            ctx.save();
+
+            let started = false;
+            ctx.beginPath();
+            for (let c = 0; c < numCols; c++) {
+                if (elementSnow[c] <= 0.3 || baseY[c] >= snowCanvas.height) {
+                    if (started) { ctx.stroke(); ctx.beginPath(); started = false; }
+                    continue;
+                }
+                const x = c * COL_WIDTH;
+                const n = elementSnow[c] > 2 ? noise[c % NOISE_LEN] * 0.7 : 0;
+                const sy = baseY[c] - elementSnow[c] - n;
+                const h = baseY[c] - sy;
+                if (h <= 0) continue;
+
+                ctx.fillStyle = `rgba(250,252,255,${0.88 + Math.min(elementSnow[c]/40, 1) * 0.1})`;
+                ctx.fillRect(x, sy, COL_WIDTH + 0.5, h);
+
+                if (!started) { ctx.moveTo(x, sy); started = true; }
+                else { ctx.lineTo(x + COL_WIDTH, sy); }
+            }
+            if (started) { ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1; ctx.stroke(); }
+
+            ctx.restore();
+        }
+
+        function renderFallingSnowflakes() {
+            const ctx = snowCtx;
+            ctx.save();
+            for (const sf of snowflakes) {
+                if (sf.landed) continue;
+                ctx.beginPath();
+                ctx.arc(sf.x, sf.y, sf.size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255,255,255,${sf.opacity})`;
+                ctx.shadowColor = 'rgba(255,255,255,0.25)';
+                ctx.shadowBlur = sf.size * 0.8;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+            ctx.restore();
+        }
+
+        function renderSky(cTimestamp) {
+            const ctx = snowCtx;
+            const t = cTimestamp * 0.001;
+
+            const atmoGrad = ctx.createRadialGradient(snowCanvas.width * 0.7, snowCanvas.height * 0.25, 50, snowCanvas.width * 0.5, snowCanvas.height * 0.5, snowCanvas.height * 0.8);
+            atmoGrad.addColorStop(0, 'rgba(180,200,240,0.06)');
+            atmoGrad.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = atmoGrad;
+            ctx.fillRect(0, 0, snowCanvas.width, snowCanvas.height);
+
+            const mx = snowCanvas.width * 0.82, my = snowCanvas.height * 0.12;
+            const moonGlow = ctx.createRadialGradient(mx, my, 10, mx, my, 160);
+            moonGlow.addColorStop(0, 'rgba(220,230,255,0.25)');
+            moonGlow.addColorStop(0.5, 'rgba(180,200,240,0.08)');
+            moonGlow.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = moonGlow;
+            ctx.fillRect(mx - 180, my - 180, 360, 360);
+
+            ctx.beginPath(); ctx.arc(mx, my, 22, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(240,245,255,0.9)'; ctx.fill();
+            ctx.beginPath(); ctx.arc(mx - 5, my - 2, 18, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(225,235,248,0.6)'; ctx.fill();
+
+            for (let i = 0; i < 80; i++) {
+                const sx = ((i * 137.508 + 42) * 31.7) % snowCanvas.width;
+                const sy = ((i * 251.173 + 42) * 19.3) % snowCanvas.height;
+                if (sy > snowCanvas.height * 0.7) continue;
+                const twinkle = 0.3 + 0.4 * Math.sin(t * 1.5 + i * 2.7) * Math.cos(t * 0.7 + i * 1.3);
+                const ss = 0.6 + Math.abs(Math.sin(i * 3.7)) * 1.4;
+                ctx.beginPath(); ctx.arc(sx, sy, ss, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255,255,255,${twinkle})`; ctx.fill();
+            }
+        }
+
+        function render(cTimestamp) {
+            snowCtx.clearRect(0, 0, snowCanvas.width, snowCanvas.height);
+            renderSky(cTimestamp);
+            renderElementSnow();
+            renderFallingSnowflakes();
+            renderGroundSnow();
+        }
+
+        // ==================== MAIN LOOP ====================
+        let lastTime = 0, counter = 0;
+        function animate(timestamp) {
+            const dt = Math.min((timestamp - lastTime) / 1000, 0.1);
+            lastTime = timestamp;
+            counter++;
+
+            if (counter % 3 === 0) {
+                smoothGroundSnow();
+                smoothElementSnow();
+            }
+            if (counter % 10 === 0) manageSnowflakeCount();
+            if (counter % 60 === 0) recalcBaseY();
+
+            for (const sf of snowflakes) sf.update(dt);
+
+            render(timestamp);
+            requestAnimationFrame(animate);
+        }
+
+        // ==================== RESIZE ====================
+        let resizeDebounce = null;
+        window.addEventListener('resize', () => {
+            if (resizeDebounce) clearTimeout(resizeDebounce);
+            resizeDebounce = setTimeout(() => {
+                snowCanvas.width = groundCanvas.width = window.innerWidth;
+                snowCanvas.height = groundCanvas.height = window.innerHeight;
+                setupHeightMap();
+                for (const sf of snowflakes) {
+                    if (sf.x > snowCanvas.width) sf.x = snowCanvas.width;
+                    if (sf.y > snowCanvas.height) sf.y = snowCanvas.height;
+                }
+            }, 200);
+        });
+
+        // ==================== CONTROLS ====================
+        function setupControls() {
+            const bind = (id, key, fmt) => {
+                const el = document.getElementById(id), valEl = document.getElementById(id + 'Val');
+                el.addEventListener('input', () => {
+                    const v = parseFloat(el.value);
+                    if (key === 'windDirection' || key === 'windSpeed' || key === 'density') config[key] = Math.round(v);
+                    else if (key === 'fallSpeed') config[key] = v / 100;
+                    if (valEl) valEl.textContent = fmt ? fmt(config[key]) : config[key];
+                });
+            };
+            bind('windSpeed', 'windSpeed', v => v);
+            bind('windDir', 'windDirection', v => v);
+            bind('density', 'density', v => v);
+            bind('fallSpeed', 'fallSpeed', v => v.toFixed(1) + 'x');
+
+            document.getElementById('btnResetSnow').addEventListener('click', clearSnow);
+            document.getElementById('btnResetElements').addEventListener('click', () => {
+                clearSnow();
+                generatePageElements();
+                recalcBaseY();
+            });
+        }
+
+        // ==================== INIT ====================
+        function init() {
+            snowCanvas.width = groundCanvas.width = window.innerWidth;
+            snowCanvas.height = groundCanvas.height = window.innerHeight;
+            setupHeightMap();
+            generatePageElements();
+            spawnSnowflakes();
+            setupControls();
+            lastTime = performance.now();
+            requestAnimationFrame(animate);
+        }
+        init();
+    })();
+    </script>
+</body>
+</html>

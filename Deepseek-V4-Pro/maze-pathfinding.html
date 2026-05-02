@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>迷宫生成器 & 寻路算法可视化</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #1a1a2e;
+    color: #eee;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 16px;
+  }
+  h1 { font-size: 1.4rem; margin-bottom: 10px; color: #e94560; }
+  canvas {
+    border: 2px solid #16213e;
+    border-radius: 6px;
+    background: #0f0f23;
+  }
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+    justify-content: center;
+    align-items: center;
+  }
+  button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: transform 0.1s, opacity 0.2s;
+  }
+  button:hover { transform: scale(1.04); }
+  button:active { transform: scale(0.97); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .btn-reset { background: #e94560; color: #fff; }
+  .btn-bfs { background: #0f3460; color: #fff; }
+  .btn-dfs { background: #533483; color: #fff; }
+  .btn-astar { background: #1a936f; color: #fff; }
+  .btn-dijkstra { background: #f4a261; color: #1a1a2e; }
+  .btn-greedy { background: #e76f51; color: #fff; }
+  .info {
+    margin-top: 8px;
+    font-size: 0.8rem;
+    color: #aaa;
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .info span { display: flex; align-items: center; gap: 4px; }
+  .dot {
+    display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+  }
+</style>
+</head>
+<body>
+
+<h1>迷宫生成器 &amp; 寻路算法可视化</h1>
+<canvas id="mazeCanvas"></canvas>
+
+<div class="controls">
+  <button class="btn-reset" onclick="resetMaze()">🔄 随机迷宫</button>
+  <button class="btn-bfs"    id="btnBFS"    onclick="runAlgorithm('bfs')">BFS 广度优先</button>
+  <button class="btn-dfs"    id="btnDFS"    onclick="runAlgorithm('dfs')">DFS 深度优先</button>
+  <button class="btn-astar"  id="btnAStar"  onclick="runAlgorithm('astar')">A* 算法</button>
+  <button class="btn-dijkstra" id="btnDijkstra" onclick="runAlgorithm('dijkstra')">Dijkstra</button>
+  <button class="btn-greedy" id="btnGreedy" onclick="runAlgorithm('greedy')">贪心最佳优先</button>
+</div>
+
+<div class="info">
+  <span><span class="dot" style="background:#00ff88"></span> 起点</span>
+  <span><span class="dot" style="background:#e94560"></span> 终点</span>
+  <span><span class="dot" style="background:#ffcc00"></span> 访问节点</span>
+  <span><span class="dot" style="background:#00ccff"></span> 最终路径</span>
+</div>
+
+<script>
+const canvas = document.getElementById('mazeCanvas');
+const ctx = canvas.getContext('2d');
+
+const COLS = 31;
+const ROWS = 23;
+let cellSize = 22;
+canvas.width = COLS * cellSize;
+canvas.height = ROWS * cellSize;
+
+const WALL = 1;
+const PATH = 0;
+
+let grid = [];
+let animating = false;
+
+// ─── Maze generation (recursive backtracking) ─────────────────
+function generateMaze() {
+  grid = Array.from({ length: ROWS }, () => Array(COLS).fill(WALL));
+
+  function carve(r, c) {
+    grid[r][c] = PATH;
+    const dirs = shuffle([[0,2],[2,0],[0,-2],[-2,0]]);
+    for (const [dr, dc] of dirs) {
+      const nr = r + dr, nc = c + dc;
+      const mr = r + dr/2, mc = c + dc/2;
+      if (nr > 0 && nr < ROWS-1 && nc > 0 && nc < COLS-1 && grid[nr][nc] === WALL) {
+        grid[mr][mc] = PATH;
+        carve(nr, nc);
+      }
+    }
+  }
+
+  grid[1][1] = PATH;
+  carve(1, 1);
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// ─── Drawing ──────────────────────────────────────────────────
+function drawMaze(visitedSet, finalPath, currentCell) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const x = c * cellSize;
+      const y = r * cellSize;
+
+      if (grid[r][c] === WALL) {
+        ctx.fillStyle = '#16213e';
+        ctx.fillRect(x, y, cellSize, cellSize);
+      } else {
+        ctx.fillStyle = '#0f0f23';
+        ctx.fillRect(x, y, cellSize, cellSize);
+      }
+    }
+  }
+
+  // Visited cells
+  if (visitedSet) {
+    for (const key of visitedSet) {
+      const [r, c] = key.split(',').map(Number);
+      ctx.fillStyle = 'rgba(255,204,0,0.35)';
+      ctx.fillRect(c * cellSize + 1, r * cellSize + 1, cellSize - 2, cellSize - 2);
+    }
+  }
+
+  // Current exploring cell
+  if (currentCell && grid[currentCell.r]?.[currentCell.c] === PATH) {
+    ctx.fillStyle = '#ff8800';
+    const cx = currentCell.c * cellSize + cellSize/2;
+    const cy = currentCell.r * cellSize + cellSize/2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, cellSize * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Final path
+  if (finalPath) {
+    for (const { r, c } of finalPath) {
+      ctx.fillStyle = '#00ccff';
+      ctx.beginPath();
+      const cx = c * cellSize + cellSize/2;
+      const cy = r * cellSize + cellSize/2;
+      ctx.arc(cx, cy, cellSize * 0.28, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Start
+  ctx.fillStyle = '#00ff88';
+  ctx.beginPath();
+  ctx.arc(1.5 * cellSize, 1.5 * cellSize, cellSize * 0.38, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Goal
+  const gr = ROWS - 2, gc = COLS - 2;
+  ctx.fillStyle = '#e94560';
+  ctx.beginPath();
+  ctx.arc((gc + 0.5) * cellSize, (gr + 0.5) * cellSize, cellSize * 0.38, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// ─── Pathfinding algorithms ───────────────────────────────────
+function getNeighbors(r, c) {
+  const dirs = [[0,1],[1,0],[0,-1],[-1,0]];
+  const result = [];
+  for (const [dr, dc] of dirs) {
+    const nr = r + dr, nc = c + dc;
+    if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && grid[nr][nc] === PATH) {
+      result.push({ r: nr, c: nc });
+    }
+  }
+  return result;
+}
+
+function heuristic(r, c, gr, gc) {
+  return Math.abs(r - gr) + Math.abs(c - gc); // Manhattan
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function reconstructPath(parentMap, start, goal) {
+  const path = [];
+  let cur = `${goal.r},${goal.c}`;
+  while (cur && parentMap.has(cur)) {
+    const [r, c] = cur.split(',').map(Number);
+    path.unshift({ r, c });
+    cur = parentMap.get(cur);
+  }
+  return path;
+}
+
+async function bfs(start, goal) {
+  const queue = [{ r: start.r, c: start.c }];
+  const visited = new Set();
+  const parentMap = new Map();
+  const visitedOrder = [];
+  visited.add(`${start.r},${start.c}`);
+
+  while (queue.length > 0) {
+    const { r, c } = queue.shift();
+    visitedOrder.push({ r, c });
+
+    drawMaze(visited, null, { r, c });
+    await sleep(20);
+
+    if (r === goal.r && c === goal.c) {
+      return { path: reconstructPath(parentMap, start, goal), visited: visited };
+    }
+
+    for (const nb of getNeighbors(r, c)) {
+      const key = `${nb.r},${nb.c}`;
+      if (!visited.has(key)) {
+        visited.add(key);
+        parentMap.set(key, `${r},${c}`);
+        queue.push(nb);
+      }
+    }
+  }
+  return { path: [], visited };
+}
+
+async function dfs(start, goal) {
+  const stack = [{ r: start.r, c: start.c }];
+  const visited = new Set();
+  const parentMap = new Map();
+  visited.add(`${start.r},${start.c}`);
+
+  while (stack.length > 0) {
+    const { r, c } = stack.pop();
+    drawMaze(visited, null, { r, c });
+    await sleep(20);
+
+    if (r === goal.r && c === goal.c) {
+      return { path: reconstructPath(parentMap, start, goal), visited };
+    }
+
+    for (const nb of getNeighbors(r, c)) {
+      const key = `${nb.r},${nb.c}`;
+      if (!visited.has(key)) {
+        visited.add(key);
+        parentMap.set(key, `${r},${c}`);
+        stack.push(nb);
+      }
+    }
+  }
+  return { path: [], visited };
+}
+
+async function astar(start, goal) {
+  const openSet = new Set();
+  openSet.add(`${start.r},${start.c}`);
+  const cameFrom = new Map();
+  const gScore = new Map();
+  gScore.set(`${start.r},${start.c}`, 0);
+  const fScore = new Map();
+  fScore.set(`${start.r},${start.c}`, heuristic(start.r, start.c, goal.r, goal.c));
+  const visited = new Set();
+
+  while (openSet.size > 0) {
+    let current = null;
+    let minF = Infinity;
+    for (const key of openSet) {
+      const f = fScore.get(key) ?? Infinity;
+      if (f < minF) { minF = f; current = key; }
+    }
+
+    const [r, c] = current.split(',').map(Number);
+    visited.add(current);
+
+    drawMaze(visited, null, { r, c });
+    await sleep(20);
+
+    if (r === goal.r && c === goal.c) {
+      return { path: reconstructPath(cameFrom, start, goal), visited };
+    }
+
+    openSet.delete(current);
+
+    for (const nb of getNeighbors(r, c)) {
+      const nbKey = `${nb.r},${nb.c}`;
+      const tentG = (gScore.get(current) ?? 0) + 1;
+      if (tentG < (gScore.get(nbKey) ?? Infinity)) {
+        cameFrom.set(nbKey, current);
+        gScore.set(nbKey, tentG);
+        fScore.set(nbKey, tentG + heuristic(nb.r, nb.c, goal.r, goal.c));
+        openSet.add(nbKey);
+      }
+    }
+  }
+  return { path: [], visited };
+}
+
+async function dijkstra(start, goal) {
+  const pq = [{ r: start.r, c: start.c, dist: 0 }];
+  const dist = new Map();
+  const parentMap = new Map();
+  const visited = new Set();
+  dist.set(`${start.r},${start.c}`, 0);
+
+  while (pq.length > 0) {
+    pq.sort((a, b) => a.dist - b.dist);
+    const { r, c } = pq.shift();
+    const key = `${r},${c}`;
+    if (visited.has(key)) continue;
+    visited.add(key);
+
+    drawMaze(visited, null, { r, c });
+    await sleep(20);
+
+    if (r === goal.r && c === goal.c) {
+      return { path: reconstructPath(parentMap, start, goal), visited };
+    }
+
+    for (const nb of getNeighbors(r, c)) {
+      const nbKey = `${nb.r},${nb.c}`;
+      const newDist = (dist.get(key) ?? 0) + 1;
+      if (newDist < (dist.get(nbKey) ?? Infinity)) {
+        dist.set(nbKey, newDist);
+        parentMap.set(nbKey, key);
+        pq.push({ r: nb.r, c: nb.c, dist: newDist });
+      }
+    }
+  }
+  return { path: [], visited };
+}
+
+async function greedy(start, goal) {
+  const pq = [{ r: start.r, c: start.c, h: heuristic(start.r, start.c, goal.r, goal.c) }];
+  const visited = new Set();
+  const parentMap = new Map();
+  visited.add(`${start.r},${start.c}`);
+
+  while (pq.length > 0) {
+    pq.sort((a, b) => a.h - b.h);
+    const { r, c } = pq.shift();
+
+    drawMaze(visited, null, { r, c });
+    await sleep(20);
+
+    if (r === goal.r && c === goal.c) {
+      return { path: reconstructPath(parentMap, start, goal), visited };
+    }
+
+    for (const nb of getNeighbors(r, c)) {
+      const nbKey = `${nb.r},${nb.c}`;
+      if (!visited.has(nbKey)) {
+        visited.add(nbKey);
+        parentMap.set(nbKey, `${r},${c}`);
+        pq.push({ r: nb.r, c: nb.c, h: heuristic(nb.r, nb.c, goal.r, goal.c) });
+      }
+    }
+  }
+  return { path: [], visited };
+}
+
+// ─── Orchestration ────────────────────────────────────────────
+function setButtonsEnabled(enabled) {
+  document.querySelectorAll('.controls button').forEach(b => b.disabled = !enabled);
+}
+
+async function runAlgorithm(type) {
+  if (animating) return;
+  animating = true;
+  setButtonsEnabled(false);
+
+  const start = { r: 1, c: 1 };
+  const goal = { r: ROWS - 2, c: COLS - 2 };
+
+  let result;
+  switch (type) {
+    case 'bfs': result = await bfs(start, goal); break;
+    case 'dfs': result = await dfs(start, goal); break;
+    case 'astar': result = await astar(start, goal); break;
+    case 'dijkstra': result = await dijkstra(start, goal); break;
+    case 'greedy': result = await greedy(start, goal); break;
+    default: result = { path: [], visited: new Set() };
+  }
+
+  // Show final result
+  drawMaze(result.visited, result.path, null);
+  animating = false;
+  setButtonsEnabled(true);
+}
+
+function resetMaze() {
+  if (animating) return;
+  generateMaze();
+  drawMaze(null, null, null);
+}
+
+// ─── Init ─────────────────────────────────────────────────────
+generateMaze();
+drawMaze(null, null, null);
+</script>
+
+</body>
+</html>

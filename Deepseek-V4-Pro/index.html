@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepSeek V4 Pro — 单文件 HTML 测试合集</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;600;700&display=swap');
+  body { font-family: 'Inter', 'Noto Sans SC', sans-serif; background: #0a0a0f; color: #e4e4e7; }
+  .glass { background: rgba(255,255,255,.03); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,.06); }
+  .glass-card { background: rgba(255,255,255,.04); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,.08); transition: all .3s ease; }
+  .glass-card:hover { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.16); transform: translateY(-4px); box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+  .gradient-text { background: linear-gradient(135deg, #14b8a6, #06b6d5, #0ea5e9); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .hero-glow { position: absolute; width: 600px; height: 600px; border-radius: 50%; filter: blur(120px); opacity: .15; pointer-events: none; }
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 500; }
+  .card-img { aspect-ratio: 16/10; object-fit: cover; width: 100%; border-radius: 12px 12px 0 0; }
+  a.demo-link {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 20px; border-radius: 999px;
+    background: linear-gradient(135deg, #14b8a6, #0ea5e9);
+    color: #fff; font-weight: 600; font-size: 14px;
+    text-decoration: none; transition: all .3s ease;
+  }
+  a.demo-link:hover { transform: scale(1.05); box-shadow: 0 8px 30px rgba(20,184,166,.4); }
+  .stat-card { text-align: center; padding: 24px; }
+  .stat-value { font-size: 36px; font-weight: 800; }
+  .stat-label { font-size: 13px; color: #a1a1aa; margin-top: 4px; }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- Hero -->
+<header class="relative overflow-hidden py-20 px-4 text-center">
+  <div class="hero-glow bg-teal-500" style="top:-200px;left:50%;transform:translateX(-50%)"></div>
+  <div class="hero-glow bg-sky-500" style="top:100px;right:-200px;"></div>
+  <div class="relative z-10 max-w-3xl mx-auto">
+    <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass text-sm text-zinc-400 mb-6">
+      <i class="fas fa-flask text-teal-400"></i> AI 生成能力测试
+    </div>
+    <h1 class="text-5xl md:text-6xl font-extrabold mb-4 tracking-tight">
+      <span class="gradient-text">DeepSeek V4 Pro</span>
+    </h1>
+    <p class="text-xl text-zinc-400 mb-2">单文件 HTML 测试合集</p>
+    <p class="text-sm text-zinc-500 max-w-lg mx-auto mt-4 leading-relaxed">
+      使用 DeepSeek 官方 API 进行测试。<br>第一个测试使用 OpenCode + <span class="text-sky-400">high</span> 推理等级，后续全部切换为 Claude Code + <span class="text-sky-400">max</span> 推理等级。
+    </p>
+    <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass text-xs text-zinc-500 mt-6">
+      <i class="fas fa-exclamation-triangle text-amber-400"></i> <span class="text-amber-300">OpenCode 踩坑：</span>疯狂泄漏内存，第二个 prompt 开始就扛不住了，换 Claude Code 后一切正常。
+    </div>
+  </div>
+</header>
+
+<!-- Stats bar -->
+<section class="max-w-5xl mx-auto px-4 pb-8">
+  <div class="glass rounded-2xl grid grid-cols-2 md:grid-cols-4 divide-x divide-white/5">
+    <div class="stat-card">
+      <div class="stat-value gradient-text">6</div>
+      <div class="stat-label">测试项目</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value text-emerald-400">5</div>
+      <div class="stat-label">成功完成</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value text-amber-400">~1.5h</div>
+      <div class="stat-label">总耗时</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value text-sky-400">3D</div>
+      <div class="stat-label">包含 3D 项目</div>
+    </div>
+  </div>
+</section>
+
+<!-- Demo cards -->
+<section class="max-w-6xl mx-auto px-4 pb-16">
+  <h2 class="text-2xl font-bold mb-8 flex items-center gap-3">
+    <span class="w-1 h-6 rounded-full bg-teal-500 inline-block"></span> 测试项目
+  </h2>
+  <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+    <!-- 雪花 -->
+    <div class="glass-card rounded-2xl overflow-hidden flex flex-col">
+      <img src="images/snow-1.png" alt="雪花效果" class="card-img">
+      <div class="p-5 flex-1 flex flex-col gap-3">
+        <div class="flex items-center gap-2">
+          <span class="tag bg-sky-500/20 text-sky-300">动画</span>
+          <span class="tag bg-sky-500/20 text-sky-300">物理</span>
+        </div>
+        <h3 class="text-lg font-semibold">❄️ 雪花效果</h3>
+        <p class="text-sm text-zinc-400 leading-relaxed flex-1">随机生成雪花从天空飘落，支持风速、风向、密度调节。雪花会在页面元素和底部渐进堆积。</p>
+        <a href="snowfall.html" class="demo-link self-start">
+          <i class="fas fa-play text-xs"></i> 打开演示
+        </a>
+      </div>
+    </div>
+
+    <!-- 迷宫 -->
+    <div class="glass-card rounded-2xl overflow-hidden flex flex-col">
+      <img src="images/maze.png" alt="迷宫生成" class="card-img">
+      <div class="p-5 flex-1 flex flex-col gap-3">
+        <div class="flex items-center gap-2">
+          <span class="tag bg-emerald-500/20 text-emerald-300">算法</span>
+          <span class="tag bg-emerald-500/20 text-emerald-300">寻路</span>
+        </div>
+        <h3 class="text-lg font-semibold">🔀 迷宫生成器</h3>
+        <p class="text-sm text-zinc-400 leading-relaxed flex-1">随机迷宫生成，内置多种寻路算法可视化（DFS / BFS / A* / Dijkstra），一键切换自动寻路。</p>
+        <a href="maze-pathfinding.html" class="demo-link self-start">
+          <i class="fas fa-play text-xs"></i> 打开演示
+        </a>
+      </div>
+    </div>
+
+    <!-- 雨滴 -->
+    <div class="glass-card rounded-2xl overflow-hidden flex flex-col">
+      <img src="images/rain.png" alt="雨滴滴落" class="card-img">
+      <div class="p-5 flex-1 flex flex-col gap-3">
+        <div class="flex items-center gap-2">
+          <span class="tag bg-blue-500/20 text-blue-300">物理模拟</span>
+          <span class="tag bg-blue-500/20 text-blue-300">视觉效果</span>
+        </div>
+        <h3 class="text-lg font-semibold">🌧️ 雨滴滴落</h3>
+        <p class="text-sm text-zinc-400 leading-relaxed flex-1">雨滴打在玻璃窗上的物理模拟。雨滴受重力滑落、相遇融合加速。可调节风速、风向、摩擦力。</p>
+        <a href="rain-on-glass.html" class="demo-link self-start">
+          <i class="fas fa-play text-xs"></i> 打开演示
+        </a>
+      </div>
+    </div>
+
+    <!-- 蟑螂 -->
+    <div class="glass-card rounded-2xl overflow-hidden flex flex-col">
+      <img src="images/cockroach.png" alt="打蟑螂" class="card-img">
+      <div class="p-5 flex-1 flex flex-col gap-3">
+        <div class="flex items-center gap-2">
+          <span class="tag bg-amber-500/20 text-amber-300">交互</span>
+          <span class="tag bg-amber-500/20 text-amber-300">动画</span>
+        </div>
+        <h3 class="text-lg font-semibold">🪳 打蟑螂</h3>
+        <p class="text-sm text-zinc-400 leading-relaxed flex-1">蟑螂在屏幕上随机移动。第一次点击加速，第二次点击爆炸消灭。含待机动画和粒子特效。</p>
+        <a href="cockroach-simulator.html" class="demo-link self-start">
+          <i class="fas fa-play text-xs"></i> 打开演示
+        </a>
+      </div>
+    </div>
+
+    <!-- 介绍页 -->
+    <div class="glass-card rounded-2xl overflow-hidden flex flex-col">
+      <img src="images/intro.png" alt="DeepSeek 介绍" class="card-img">
+      <div class="p-5 flex-1 flex flex-col gap-3">
+        <div class="flex items-center gap-2">
+          <span class="tag bg-sky-500/20 text-sky-300">品牌页</span>
+          <span class="tag bg-sky-500/20 text-sky-300">视差</span>
+        </div>
+        <h3 class="text-lg font-semibold">🌐 DeepSeek 介绍页</h3>
+        <p class="text-sm text-zinc-400 leading-relaxed flex-1">现代风格的 DeepSeek 品牌介绍页面。玻璃材质、视差效果、鼠标驱动的粒子背景、滚动动画。</p>
+        <a href="deepseek-intro.html" class="demo-link self-start">
+          <i class="fas fa-play text-xs"></i> 打开演示
+        </a>
+      </div>
+    </div>
+
+    <!-- 飞行射击 -->
+    <div class="glass-card rounded-2xl overflow-hidden flex flex-col">
+      <img src="images/sky.png" alt="飞行射击" class="card-img">
+      <div class="p-5 flex-1 flex flex-col gap-3">
+        <div class="flex items-center gap-2">
+          <span class="tag bg-rose-500/20 text-rose-300">3D</span>
+          <span class="tag bg-rose-500/20 text-rose-300">游戏</span>
+        </div>
+        <h3 class="text-lg font-semibold">✈️ 驾驶舱飞行射击</h3>
+        <p class="text-sm text-zinc-400 leading-relaxed flex-1">第一人称 3D 空战游戏。W/S 俯仰、A/D 滚转、鼠标瞄准射击。敌机生成、得分系统、HUD 界面。</p>
+        <a href="sky-fury.html" class="demo-link self-start">
+          <i class="fas fa-play text-xs"></i> 打开演示
+        </a>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- Token & Pricing -->
+<section class="max-w-5xl mx-auto px-4 pb-20">
+  <h2 class="text-2xl font-bold mb-8 flex items-center gap-3">
+    <span class="w-1 h-6 rounded-full bg-amber-500 inline-block"></span> Token 消耗 & 费用
+  </h2>
+  <div class="grid md:grid-cols-2 gap-6">
+    <div class="glass-card rounded-2xl overflow-hidden">
+      <img src="images/pro-token.png" alt="DeepSeek V4 Pro Token" class="w-full">
+    </div>
+    <div class="glass-card rounded-2xl overflow-hidden">
+      <img src="images/flash-token.png" alt="DeepSeek V4 Flash Token" class="w-full">
+    </div>
+  </div>
+  <div class="mt-6 glass-card rounded-2xl overflow-hidden max-w-md mx-auto">
+    <img src="images/price.png" alt="费用" class="w-full">
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="border-t border-white/5 py-10 text-center text-sm text-zinc-500">
+  <p>DeepSeek V4 Pro 单文件 HTML 测试合集 · 仅供娱乐参考</p>
+  <p class="mt-1">首轮 <span class="text-sky-400">OpenCode + high</span>，后续 <span class="text-sky-400">Claude Code + max</span></p>
+</footer>
+
+</body>
+</html>
