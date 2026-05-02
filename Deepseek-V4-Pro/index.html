@@ -198,6 +198,63 @@
   </div>
 </section>
 
+  <!-- Test Summary Table -->
+  <section class="max-w-5xl mx-auto px-4 pb-16">
+    <h2 class="text-2xl font-bold mb-8 flex items-center gap-3">
+      <span class="w-1 h-6 rounded-full bg-violet-500 inline-block"></span> 测试总结
+    </h2>
+    <div class="glass rounded-2xl overflow-hidden">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-white/10 text-zinc-400 text-xs uppercase tracking-wider">
+            <th class="text-left py-4 px-6 font-medium">项目</th>
+            <th class="text-center py-4 px-4 font-medium w-28">完成度</th>
+            <th class="text-center py-4 px-4 font-medium w-20">总轮次</th>
+            <th class="text-left py-4 px-6 font-medium">评价</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-white/5">
+          <tr class="hover:bg-white/[.02] transition-colors">
+            <td class="py-4 px-6 font-medium whitespace-nowrap">❄️ 雪花效果</td>
+            <td class="py-4 px-4 text-center"><span class="tag bg-amber-500/20 text-amber-300">基本完成</span></td>
+            <td class="py-4 px-4 text-center text-zinc-400">3</td>
+            <td class="py-4 px-6 text-zinc-400 leading-relaxed">首次思考阶段卡住 10 分钟，重试后正常输出。雪花堆积效果渐进式，但会产生"雪墙"导致雪花卡住，后续 2 轮修复未果。</td>
+          </tr>
+          <tr class="hover:bg-white/[.02] transition-colors">
+            <td class="py-4 px-6 font-medium whitespace-nowrap">🔀 迷宫生成器</td>
+            <td class="py-4 px-4 text-center"><span class="tag bg-emerald-500/20 text-emerald-300">完美完成</span></td>
+            <td class="py-4 px-4 text-center text-zinc-400">1</td>
+            <td class="py-4 px-6 text-zinc-400 leading-relaxed">2 分 10 秒完成，完全满足需求。内置 DFS / BFS / A* / Dijkstra 多种寻路算法可视化。</td>
+          </tr>
+          <tr class="hover:bg-white/[.02] transition-colors">
+            <td class="py-4 px-6 font-medium whitespace-nowrap">🌧️ 雨滴滴落</td>
+            <td class="py-4 px-4 text-center"><span class="tag bg-emerald-500/20 text-emerald-300">完成</span></td>
+            <td class="py-4 px-4 text-center text-zinc-400">2</td>
+            <td class="py-4 px-6 text-zinc-400 leading-relaxed">首轮 23 分钟，物理模拟出色，甚至做了窗外背景。第二轮补增雨量，整体效果很好。</td>
+          </tr>
+          <tr class="hover:bg-white/[.02] transition-colors">
+            <td class="py-4 px-6 font-medium whitespace-nowrap">🪳 打蟑螂</td>
+            <td class="py-4 px-4 text-center"><span class="tag bg-emerald-500/20 text-emerald-300">完成（修复后）</span></td>
+            <td class="py-4 px-4 text-center text-zinc-400">3</td>
+            <td class="py-4 px-6 text-zinc-400 leading-relaxed">首轮不到 10 分钟，模型画出了真蟑螂。但有两点 bug：移动方向错误、点击直接爆炸未分阶段，2 轮修复完成。</td>
+          </tr>
+          <tr class="hover:bg-white/[.02] transition-colors">
+            <td class="py-4 px-6 font-medium whitespace-nowrap">🌐 DeepSeek 介绍页</td>
+            <td class="py-4 px-4 text-center"><span class="tag bg-emerald-500/20 text-emerald-300">完成</span></td>
+            <td class="py-4 px-4 text-center text-zinc-400">1</td>
+            <td class="py-4 px-6 text-zinc-400 leading-relaxed">思考阶段再次卡住 10 分钟，continue 后跳过思考直接生成。紫色主题，多层粒子跟随鼠标缓动效果不错。</td>
+          </tr>
+          <tr class="hover:bg-white/[.02] transition-colors">
+            <td class="py-4 px-6 font-medium whitespace-nowrap">✈️ 驾驶舱飞行射击</td>
+            <td class="py-4 px-4 text-center"><span class="tag bg-amber-500/20 text-amber-300">基本可玩</span></td>
+            <td class="py-4 px-4 text-center text-zinc-400">4</td>
+            <td class="py-4 px-6 text-zinc-400 leading-relaxed">首轮 17 分钟，3D 场景完整（地面 / 天空 / 云 / HUD）。滚转后 W/S 方向不对，第 2 轮修复并加入反转开关。地形远距离消失问题又花 2 轮修复，最终基本可玩。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
 <!-- Footer -->
 <footer class="border-t border-white/5 py-10 text-center text-sm text-zinc-500">
   <p>DeepSeek V4 Pro 单文件 HTML 测试合集 · 仅供娱乐参考</p>
