@@ -151,10 +151,13 @@ emmm,又在思考阶段卡住了10分钟。然后`✻ Worked for 10m 29s`。没�
 # token消耗
 
 Deepseek v4 Pro:
+
 ![](images/pro-token.png)
 
 Deepseek v4 Flash:
+
 ![](images/flash-token.png)
 
-费用:  
+费用:
+
 ![](images/price.png)
